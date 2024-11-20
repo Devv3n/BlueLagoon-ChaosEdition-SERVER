@@ -10,7 +10,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         static void Main() {
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
-            //yeah yeah no one cares
+            //"yeah yeah no one cares"
             //- DevvEn
 
             ApplicationConfiguration.Initialize();
@@ -48,7 +48,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     }
 
     public static class NetworkHandler {
-        static List<Client> clients = new List<Client>();
+        public static List<Client> clients = new List<Client>();
         static TcpListener server;
 
         public static void StartServer(int port) {
@@ -105,14 +105,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
 
             CheckAlive();
-            foreach (Client client in clients)
+            foreach (Client client in clients) {
+                client.SendData([0]);
                 client.SendData(buffer);
+                client.SendData([1, 3, 3, 0, 255, 0, 0 ]);
+            }
         }
     }
 
     public static class MapHandler {
-        static readonly int[][] hexOffsets0 = [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [0, -1]];
-        static readonly int[][] hexOffsets1 = [[-1, -1], [-1, 0], [0, 1], [1, 0], [1, -1], [0, -1]];
+        static readonly int[][] hexOffsets0 = [[-1, -1], [-1, 0], [0, 1], [1, 0], [1, -1], [0, -1]];
+        static readonly int[][] hexOffsets1 = [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [0, -1]];
         public const int mapSize = 16;
 
         public static FastNoiseLite noise = new FastNoiseLite();

@@ -35,10 +35,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
 
                 case 1: {
-                        gameStatus = 2;
-                        ServerButton.Text = "...";
-                        MapHandler.MakeMap();
-                        NetworkHandler.SendMap();
+                        if (NetworkHandler.clients.Count >= 2) {
+                            gameStatus = 2;
+                            ServerButton.Text = "...";
+                            MapHandler.MakeMap();
+                            NetworkHandler.SendMap();
+                        }
+                        else
+                            MessageBox.Show("Not enough players to start the game!", "erawrrrr", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
                         break;
                 }
             }
