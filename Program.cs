@@ -2,6 +2,24 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
+// "2-Dimensional Representation Of A 3-Dimensional Cross-Section Of A 4-Dimensional Cube"
+//      +___________+
+//     /:\         ,:\
+//    / : \       , : \
+//   /  :  \     ,  :  \
+//  /   :   +-----------+
+// +....:../:...+   :  /|
+// |\   +./.:...`...+ / |
+// | \ ,`/  :   :` ,`/  |
+// |  \ /`. :   : ` /`  |
+// | , +-----------+  ` |
+// |,  |   `+...:,.|...`+
+// +...|...,'...+  |   /
+//  \  |  ,     `  |  /
+//   \ | ,       ` | /
+//    \|,         `|/   mn, 7/97
+//     +___________+
+
 namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     internal static class Program {
         public static Server form = new Server();
@@ -13,17 +31,45 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             //"yeah yeah no one cares"
             //- DevvEn
 
+            GameHandler.noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
             ApplicationConfiguration.Initialize();
-            MapHandler.noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
 
             Application.Run(form);
+
+            Logging.CloseLog();
         }
     }
 
+    // file handling!!
+    public static class Logging {
+        static StreamWriter sw = new StreamWriter("Log.txt");
+
+        public static void Log(string? message) {
+            sw?.WriteLine($"<{CurrentTime()}> {message}");
+        }
+
+        public static void LogException(string? message) {
+            sw?.WriteLine($"[{CurrentTime()}] {message}");
+        }
+
+        public static void CloseLog() {
+            sw?.WriteLine($"|{CurrentTime()}| Goodbye!");
+            sw?.Close();
+        }
+
+        static string CurrentTime() => DateTime.Now.ToString("HH:mm:ss");
+    }
+
+
     public class Client {
+        public bool alive = true;
         public TcpClient client;
         public NetworkStream stream;
         public string username;
+        public Color color;
+
+        public int[] resourceCount = new int[6];
+        public int settlerCount = 10;
 
         public Client(TcpClient client) {
             this.client = client;
@@ -32,23 +78,122 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             byte[] buffer = new byte[128];
             stream.Read(buffer, 0, buffer.Length);
             username = Encoding.Unicode.GetString(buffer);
+
+            Random rng = new Random();
+            color = Color.FromArgb(255, rng.Next(256), rng.Next(256), rng.Next(256));
+
+            Task.Run(HandleData);
+            Logging.Log($"New client '{username}'");
         }
 
-        public bool SendData(Byte[] data) {
-            try {
-                stream.Write(data);
+        // Attempts to send a length of 0 byte array and if no errors then client probablyyy still connected
+        public bool IsAlive() {
+            if (alive) {
+                try {
+                    bool blockingState = client.Client.Blocking;
+                    try {
+                        client.Client.Blocking = false;
+                        client.Client.Send(new byte[1], 0, 0);
+                    }
+                    catch {
+                        CloseClient();
+                        return false;
+                    }
+                    finally {
+                        client.Client.Blocking = blockingState;
+                    }
+                }
+                catch {
+                    CloseClient();
+                    return false;
+                }
+
                 return true;
             }
-            catch {
-                stream.Close();
-                client.Close();
+            else
                 return false;
+        }
+
+        public void CloseClient() {
+            if (alive) {
+                alive = false;
+                stream?.Close();
+                client?.Close();
+                NetworkHandler.RemoveClient(this);
+
+                if (Program.form.gameStatus != 1 && GameHandler.turn == this)
+                    GameHandler.ChooseNextPlayer();
+
+                Logging.Log($"Client '{username}' left");
+            }
+        }
+        
+        // Data handling (sending/reading) functions
+        public void SendData(byte type, byte[] data) {
+            if (alive) {
+                try {
+                    stream.WriteByte(type);
+                    stream.Write(data);
+                }
+                catch {
+                    CloseClient();
+                }
+            }
+        }
+        void ReadBuffer(byte[] buffer) {
+            try {
+                stream.Read(buffer, 0, buffer.Length);
+            }
+            catch {
+                CloseClient();
+            }
+        }
+        int ReadByte() {
+            try {
+                return stream.ReadByte();
+            }
+            catch {
+                CloseClient();
+                return -1;
+            }
+        }
+
+        async void HandleData() {
+            while (alive) {
+                int dataType = ReadByte();
+                switch (dataType) {
+                    // hex click
+                    case 200: {
+                            byte[] data = new byte[2]; // y, x
+                            ReadBuffer(data);
+                            GameHandler.PlaceSettler(this, data[0], data[1]);
+                            
+                            break;
+                        }
+
+                    
+                    // no data to process :(
+                    case -1: {
+                            await Task.Delay(200);
+                            break;
+                        }
+
+
+                    // bad buffer
+                    default: {
+                            while (ReadByte() != -1)
+                                continue;
+
+                            break;
+                        }
+                }
             }
         }
     }
 
     public static class NetworkHandler {
         public static List<Client> clients = new List<Client>();
+        public static List<Client> deadClients = new List<Client>();
         static TcpListener server;
 
         public static void StartServer(int port) {
@@ -60,7 +205,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         static async void HandleConnections() {
             while (true) {
                 Client client = new Client(await server.AcceptTcpClientAsync());
+                
                 clients.Add(client);
+                foreach (Client c in clients) {
+                    if (c != client) {
+                        client.SendData(220, Encoding.Unicode.GetBytes(c.username));
+                    }
+                    c.SendData(220, Encoding.Unicode.GetBytes(client.username));
+                }
 
                 Label lbl = new Label();
                 lbl.Text = client.username;
@@ -68,80 +220,136 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
-        static void CheckAlive() {
-            List<int> deadClients = new List<int>();
-            byte[] tmp = new byte[1];
-            int i = 0;
-
-            foreach (Client client in clients) {
-                bool blockingState = client.client.Client.Blocking;
-                try {
-                    client.client.Client.Blocking = false;
-                    client.client.Client.Send(tmp, 0, 0);
-                }
-                catch {
-                    deadClients.Add(i);
-                }
-                finally {
-                    client.client.Client.Blocking = blockingState;
-                }
-                i++;
-            }
-
-            i = 0;
-            foreach (int client in deadClients) {
-                Program.form.tableLayoutPanel3.Controls.Remove(Program.form.tableLayoutPanel3.GetControlFromPosition(0, client - i));
-                clients.RemoveAt(client - i++);
-            }
+        // Dead client handling
+        public static void RemoveClient(Client client) {
+            client.CloseClient();
+            if (Program.form.gameStatus == 1)
+                clients.Remove(client);
+            else
+                deadClients.Add(client);
+        }
+        public static void RemoveDeadClients() {
+            foreach (Client deadClient in deadClients)
+                RemoveClient(deadClient);
+            deadClients.Clear();
         }
 
+        // Sending data to clients functions
         public static void SendMap() {
-            byte[] buffer = new Byte[MapHandler.GetMapByteSize()];
+            byte[] buffer = new byte[GameHandler.map.Length];
             int i = 0;
-            for (int y = 0; y < MapHandler.map.GetLength(0); y++) {
-                for (int x = 0; x < MapHandler.map.GetLength(1); x++) {
-                    buffer[i++] = (byte)MapHandler.map[y, x];
-                }
-            }
+            foreach (Hexagon hex in GameHandler.map)
+                buffer[i++] = (byte)hex.biome;
 
-            CheckAlive();
             foreach (Client client in clients) {
-                client.SendData([0]);
-                client.SendData(buffer);
-                client.SendData([1, 3, 3, 0, 255, 0, 0 ]);
+                client.SendData(210, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
+                client.SendData(211, [3, 3, 255, 0, 0]);
+            }
+        }
+        public static void SendHexUpdate(Hexagon hex) {
+            if (hex != null) {
+                foreach (Client client in clients)
+                    client.SendData(211, [(byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
             }
         }
     }
 
-    public static class MapHandler {
-        static readonly int[][] hexOffsets0 = [[-1, -1], [-1, 0], [0, 1], [1, 0], [1, -1], [0, -1]];
-        static readonly int[][] hexOffsets1 = [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [0, -1]];
-        public const int mapSize = 16;
 
-        public static FastNoiseLite noise = new FastNoiseLite();
-        static Random random = new Random();
 
-        public static int[,] map = new int[mapSize, mapSize];
+    public class Hexagon(int biome, int y, int x) {
+        // Const references
+        public static readonly int[][] hexOffsets0 = [[-1, -1], [-1, 0], [0, 1], [1, 0], [1, -1], [0, -1]];
+        public static readonly int[][] hexOffsets1 = [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [0, -1]];
+        static readonly int[][] biomeResourceTypes = [[0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4], [0, 2, 3]];
+        static readonly Random random = new Random();
+
+        // Hex configuration
+        public int y = y;
+        public int x = x;
+        public int biome = biome;
+        public int resource = -1;
+        public Client? settler;
+
+        // Hex configuring functions
+        public void SetRandomResource() {
+            int[] resourceTypes = biomeResourceTypes[biome - 1];
+            while (true) {
+                resource = resourceTypes[random.Next(resourceTypes.Length)];
+                switch (resource) {
+                        case 3:    
+                        case 5: {
+                            if (!FindNearbyWater())
+                                continue;
+                            break;
+                        }
+
+                        case 4: {
+                            if (FindNearbyWater())
+                                continue;
+                            break;
+                        }
+                }
+
+                break;
+            }
+        }
+
+        // Search neighbouring hexes functions
+        static bool WithinMapBounds(int y, int x) => 0 <= y && y < GameHandler.mapSize && 0 <= x && x < GameHandler.mapSize;
+        public bool FindNearbyResources() {
+            foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1) 
+                if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].resource != -1)
+                    return true;
+
+            return false;
+        }
+        public bool FindNearbyWater() {
+            foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1)
+                if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].biome == 0)
+                    return true;
+
+            return false;
+        }
+        public bool FindNearbySettler(Client settler) {
+            foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1)
+                if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].settler == settler)
+                    return true;
+
+            return false;
+        }
+    }
+
+    public static class GameHandler {
+        // Const referneces
+        public static readonly FastNoiseLite noise = new FastNoiseLite();
+        static readonly Random random = new Random();
+
+        // Map configuration
+        public static int mapSize;
+        public static Hexagon[,] map;
         static List<List<int>>? islands;
 
+        // Game Configuration
+        public static Client? turn;
+
+        // Functions for generating map
         static void GenerateMap() {
             int xOffset = random.Next(-10000, 10000);
             int yOffset = random.Next(-10000, 10000);
 
             for (int y = 0; y < mapSize; y++) {
                 for (int x = 0; x < mapSize; x++) {
-                    map[y, x] = noise.GetNoise(x * 15 + xOffset, y * 15 + yOffset) > 0.05 ? 1 : 0;
+                    map[y, x] = new Hexagon(noise.GetNoise(x * 15 + xOffset, y * 15 + yOffset) > 0.05 ? 1 : 0, y, x);
                 }
             }
         }
-
         static List<List<int>> DetectIslands() {
             bool[,] searched = new bool[mapSize, mapSize];
             islands = new List<List<int>>();
 
             for (int y = 0; y < mapSize; y++) {
                 for (int x = 0; x < mapSize; x++) {
-                    if (searched[y, x] || map[y, x] == 0) {
+                    if (searched[y, x] || map[y, x].biome == 0) {
                         searched[y, x] = true;
                         continue;
                     }
@@ -151,11 +359,11 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     void SearchNearby(int y, int x) {
                         if (0 <= y && y < mapSize && 0 <= x && x < mapSize && !searched[y, x]) {
                             searched[y, x] = true;
-                            if (map[y, x] == 0)
+                            if (map[y, x].biome == 0)
                                 return;
 
                             islandPos.Add(y * mapSize + x);
-                            foreach (int[] o in (y % 2 == 0 ? hexOffsets0 : hexOffsets1))
+                            foreach (int[] o in (y % 2 == 0 ? Hexagon.hexOffsets0 : Hexagon.hexOffsets1))
                                 SearchNearby(y + o[0], x + o[1]);
                         }
                     }
@@ -168,17 +376,16 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             return islands;
         }
-
         static bool ValidateIslands(List<List<int>> islands) {
             int bigIslandCount = 0;
             List<List<int>> removeIslands = new List<List<int>>();
 
             foreach (List<int> island in islands) {
-                if (island.Count > 6)
+                if (island.Count > (mapSize/3))
                     bigIslandCount++;
                 else {
                     foreach (int hex in island)
-                        map[hex / mapSize, hex % mapSize] = 0;
+                        map[hex / mapSize, hex % mapSize].biome = 0;
                     removeIslands.Add(island);
                 }
             }
@@ -190,24 +397,83 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 return true;
             return false;
         }
-
         static void SetIslandBiomes(List<List<int>> islands) {
             foreach (List<int> island in islands) {
                 int biome = random.Next(1, 4);
 
                 foreach (int hex in island)
-                    map[hex / mapSize, hex % mapSize] = biome;
+                    map[hex / mapSize, hex % mapSize].biome = biome;
             }
         }
+        static void GenerateResources() {
+            int resourceCount = 0;
+            int attempts = mapSize * mapSize;
+            while (resourceCount < mapSize*3/2 && attempts-- > 0) {
+                Hexagon hex = map[random.Next(mapSize), random.Next(mapSize)];
 
-        public static void MakeMap() {
+                if (hex.biome != 0 && hex.resource == -1 && !hex.FindNearbyResources()) {
+                    hex.SetRandomResource();
+                    resourceCount++;
+                }
+            }
+            Logging.Log($"Generated {resourceCount}/{mapSize * 3 / 2} resources");
+        }
+        public static void MakeMap(int size) {
+            mapSize = size;
+            map = new Hexagon[mapSize, mapSize];
             do {
                 GenerateMap();
                 islands = DetectIslands();
             } while (!ValidateIslands(islands));
             SetIslandBiomes(islands);
+            GenerateResources();
+        }
+    
+        // Gameplay functions
+        public static bool ChooseNextPlayer() {
+            int index = NetworkHandler.clients.IndexOf(turn);
+            int loops = 0;
+
+            // Find next alive client
+            while (loops <= 1) {
+                index = ++index % NetworkHandler.clients.Count;
+                if (index == 0)
+                    loops++;
+
+                Client next = NetworkHandler.clients[index];
+                if (next.IsAlive() && next != turn) {
+                    turn = next;
+                    break;
+                }
+            }
+
+            // If the while loop did more than 1 loop around the client list then it means everyone is dead
+            if (loops > 1) {
+                Program.form.FinishGame();
+                return false;
+            }
+            else
+                return true;
         }
 
-        public static int GetMapByteSize() => map.Length;
+        // Update hex to place settler & send everyone hex update
+        public static void PlaceSettler(Client client, int y, int x) {
+            if (turn == client && 0 <= x && x < mapSize && 0 <= y && y < mapSize) {
+                Hexagon hex = map[y, x];
+                int settlerUsage = hex.settler == null ? 1 : 3;
+                if (client.settlerCount < settlerUsage || hex.settler == client)
+                    return;
+                    
+                if ((Program.form.gameStatus == 2 && hex.biome == 0) || hex.FindNearbySettler(client)) {
+                    hex.settler = client;
+                    if (hex.resource != -1) {
+                        client.resourceCount[hex.resource]++;
+                        hex.resource = -1;
+                    }
+                    NetworkHandler.SendHexUpdate(hex);
+                    ChooseNextPlayer();
+                }
+            }
+        }
     }
 }
