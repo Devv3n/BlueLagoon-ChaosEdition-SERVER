@@ -20,7 +20,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         public void FinishGame() {
             gameStatus = 1;
-            ServerButton.Text = "Start Game";
+            Invoke(() => ServerButton.Text = "Start Game");
+            NetworkHandler.SendAllClients(213);
             NetworkHandler.RemoveDeadClients();
         }
 

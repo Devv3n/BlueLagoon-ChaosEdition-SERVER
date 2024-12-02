@@ -1,6 +1,10 @@
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // "2-Dimensional Representation Of A 3-Dimensional Cross-Section Of A 4-Dimensional Cube"
 //      +___________+
@@ -69,7 +73,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public Color color;
 
         public int[] resourceCount = new int[6];
-        public int settlerCount = 10;
+        public int settlerCount = 30;
+        public int villageCount = 3;
 
         public Client(TcpClient client) {
             this.client = client;
@@ -129,11 +134,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         
         // Data handling (sending/reading) functions
-        public void SendData(byte type, byte[] data) {
+        public void SendData(byte type, byte[]? data) {
             if (alive) {
                 try {
                     stream.WriteByte(type);
-                    stream.Write(data);
+                    if (data != null)
+                        stream.Write(data);
                 }
                 catch {
                     CloseClient();
@@ -164,9 +170,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 switch (dataType) {
                     // hex click
                     case 200: {
-                            byte[] data = new byte[2]; // y, x
+                            byte[] data = new byte[3]; // type, y, x
                             ReadBuffer(data);
-                            GameHandler.PlaceSettler(this, data[0], data[1]);
+                            GameHandler.PlaceSettler(this, data[0], data[1], data[2]);
                             
                             break;
                         }
@@ -235,21 +241,37 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
 
         // Sending data to clients functions
-        public static void SendMap() {
-            byte[] buffer = new byte[GameHandler.map.Length];
-            int i = 0;
-            foreach (Hexagon hex in GameHandler.map)
-                buffer[i++] = (byte)hex.biome;
-
-            foreach (Client client in clients) {
-                client.SendData(210, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
-                client.SendData(211, [3, 3, 255, 0, 0]);
-            }
+        public static void SendAllClients(byte type) {
+            foreach (Client client in clients)
+                client.SendData(type, null);
         }
-        public static void SendHexUpdate(Hexagon hex) {
+        public static void SendAllClients(byte type, byte[] data) {
+            foreach (Client client in clients)
+                client.SendData(type, data);
+        }
+        public static void SendMap() {
+            List<Hexagon> resourceHexes = new List<Hexagon>();
+            byte[] buffer = new byte[GameHandler.map.Length];
+            
+            int i = 0;
+            foreach (Hexagon hex in GameHandler.map) {
+                buffer[i++] = (byte)hex.biome;
+                if (hex.resource != -1)
+                    resourceHexes.Add(hex);
+            }
+
+            foreach (Client client in clients) 
+                client.SendData(210, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
+
+            foreach (Hexagon hex in resourceHexes)
+                SendHexUpdate(hex, -1);
+        }
+        public static void SendHexUpdate(Hexagon hex, int type) {
             if (hex != null) {
-                foreach (Client client in clients)
-                    client.SendData(211, [(byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
+                if (type == 0 || type == 1) // settler || village
+                    SendAllClients(211, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
+                else // any value not settler || village
+                    SendAllClients(211, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
             }
         }
     }
@@ -269,6 +291,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public int biome = biome;
         public int resource = -1;
         public Client? settler;
+        public bool village = false;
 
         // Hex configuring functions
         public void SetRandomResource() {
@@ -328,9 +351,10 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public static int mapSize;
         public static Hexagon[,] map;
         static List<List<int>>? islands;
-
+    
         // Game Configuration
         public static Client? turn;
+        static int? resourceCount;
 
         // Functions for generating map
         static void GenerateMap() {
@@ -405,18 +429,24 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     map[hex / mapSize, hex % mapSize].biome = biome;
             }
         }
-        static void GenerateResources() {
-            int resourceCount = 0;
+        static int[] GenerateResources() {
+            resourceCount = 0;
+            List<int> resourcePos = new List<int>();
+            
             int attempts = mapSize * mapSize;
             while (resourceCount < mapSize*3/2 && attempts-- > 0) {
                 Hexagon hex = map[random.Next(mapSize), random.Next(mapSize)];
 
                 if (hex.biome != 0 && hex.resource == -1 && !hex.FindNearbyResources()) {
                     hex.SetRandomResource();
+                    
                     resourceCount++;
+                    resourcePos.Add(hex.y * mapSize + hex.x);
                 }
             }
+            
             Logging.Log($"Generated {resourceCount}/{mapSize * 3 / 2} resources");
+            return resourcePos.ToArray();
         }
         public static void MakeMap(int size) {
             mapSize = size;
@@ -430,47 +460,92 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
     
         // Gameplay functions
-        public static bool ChooseNextPlayer() {
-            int index = NetworkHandler.clients.IndexOf(turn);
-            int loops = 0;
+        static bool CheckForEnd() {
+            if (resourceCount == 0)
+                return true;
 
-            // Find next alive client
-            while (loops <= 1) {
-                index = ++index % NetworkHandler.clients.Count;
-                if (index == 0)
-                    loops++;
+            foreach (Client client in NetworkHandler.clients) {
+                if (client.settlerCount != 0)
+                    return false;
+            }
 
-                Client next = NetworkHandler.clients[index];
-                if (next.IsAlive() && next != turn) {
-                    turn = next;
-                    break;
+            return true;
+        }
+        static void NextRound() {
+            if (Program.form.gameStatus == 2) {
+                Program.form.gameStatus = 3;
+                turn = NetworkHandler.clients[0];
+
+                foreach (Hexagon hex in map) {
+                    hex.resource = -1;
+                    if (!hex.village) {
+                        hex.settler = null;
+                        hex.village = false;
+                    }
+                }
+
+                NetworkHandler.SendAllClients(212);
+                int[] resourcePos = GenerateResources();
+                foreach (int pos in resourcePos) {
+                    NetworkHandler.SendHexUpdate(map[pos / mapSize, pos % mapSize], -1);
                 }
             }
-
-            // If the while loop did more than 1 loop around the client list then it means everyone is dead
-            if (loops > 1) {
+            else if (Program.form.gameStatus == 3)
                 Program.form.FinishGame();
-                return false;
+        }
+        public static void ChooseNextPlayer() {
+            if (CheckForEnd())
+                NextRound();
+
+            else {
+                int index = NetworkHandler.clients.IndexOf(turn);
+                int loops = 0;
+
+                // Find next alive client
+                while (loops <= 1) {
+                    index = ++index % NetworkHandler.clients.Count;
+                    if (index == 0)
+                        loops++;
+
+                    Client next = NetworkHandler.clients[index];
+                    if (next.IsAlive() && next != turn) {
+                        turn = next;
+                        break;
+                    }
+                }
+
+                // If the while loop did more than 1 loop around the client list then it means everyone is dead
+                if (loops > 1)
+                    Program.form.FinishGame();
             }
-            else
-                return true;
         }
 
-        // Update hex to place settler & send everyone hex update
-        public static void PlaceSettler(Client client, int y, int x) {
+        // Update hex to place settler/village & send everyone hex update
+        public static void PlaceSettler(Client client, int type, int y, int x) {
             if (turn == client && 0 <= x && x < mapSize && 0 <= y && y < mapSize) {
                 Hexagon hex = map[y, x];
+
                 int settlerUsage = hex.settler == null ? 1 : 3;
-                if (client.settlerCount < settlerUsage || hex.settler == client)
-                    return;
-                    
-                if ((Program.form.gameStatus == 2 && hex.biome == 0) || hex.FindNearbySettler(client)) {
-                    hex.settler = client;
-                    if (hex.resource != -1) {
-                        client.resourceCount[hex.resource]++;
-                        hex.resource = -1;
+                if (type == 0 && hex.settler != client && !hex.village && client.settlerCount >= settlerUsage) {
+                    if ((Program.form.gameStatus == 2 && hex.biome == 0) || hex.FindNearbySettler(client)) {
+                        client.settlerCount -= settlerUsage;
+                        hex.settler = client;
+                        
+                        if (hex.resource != -1) {
+                            client.resourceCount[hex.resource]++;
+                            hex.resource = -1;
+                        }
+                        
+                        NetworkHandler.SendHexUpdate(hex, 0);
+                        ChooseNextPlayer();
                     }
-                    NetworkHandler.SendHexUpdate(hex);
+                }
+
+                else if (type == 1 && hex.settler == client && !hex.village && client.villageCount > 0) {
+                    client.villageCount--;
+                    hex.village = true;
+
+                    NetworkHandler.SendHexUpdate(hex, 1);
                     ChooseNextPlayer();
                 }
             }
