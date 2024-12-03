@@ -20,9 +20,11 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         public void FinishGame() {
             gameStatus = 1;
-            Invoke(() => ServerButton.Text = "Start Game");
+            GameHandler.ResetAllPlayers();
             NetworkHandler.SendAllClients(213);
-            NetworkHandler.RemoveDeadClients();
+
+            Invoke(() => ServerButton.Text = "Start Game");
+            NetworkHandler.AddWaitingClients();
         }
 
         private void Form_Resize(object sender, EventArgs e) {
@@ -65,6 +67,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                             ServerButton.Text = "...";
                             GameHandler.MakeMap(int.Parse(MapSizeBox.Text));
                             GameHandler.turn = NetworkHandler.clients[0];
+                            NetworkHandler.SendAllClients(222, [0]);
                             NetworkHandler.SendMap();
                             Logging.Log($"Game started with map size {GameHandler.mapSize}");
                         }

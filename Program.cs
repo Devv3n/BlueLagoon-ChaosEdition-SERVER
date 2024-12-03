@@ -66,6 +66,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
 
     public class Client {
+        const int defaultSettlerCount = 5;
+        const int defaultVillageCount = 3;
+        
         public bool alive = true;
         public TcpClient client;
         public NetworkStream stream;
@@ -73,8 +76,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public Color color;
 
         public int[] resourceCount = new int[6];
-        public int settlerCount = 30;
-        public int villageCount = 3;
+        public int settlerCount = defaultSettlerCount;
+        public int villageCount = defaultVillageCount;
 
         public Client(TcpClient client) {
             this.client = client;
@@ -164,6 +167,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
+        // Gameplay Functions
         async void HandleData() {
             while (alive) {
                 int dataType = ReadByte();
@@ -195,11 +199,16 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
+        public void Reset() {
+            resourceCount = new int[6];
+            settlerCount = defaultSettlerCount;
+            villageCount = defaultVillageCount;
+        }
     }
 
     public static class NetworkHandler {
         public static List<Client> clients = new List<Client>();
-        public static List<Client> deadClients = new List<Client>();
+        static List<Client> waitingClients = new List<Client>();
         static TcpListener server;
 
         public static void StartServer(int port) {
@@ -211,33 +220,53 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         static async void HandleConnections() {
             while (true) {
                 Client client = new Client(await server.AcceptTcpClientAsync());
-                
-                clients.Add(client);
-                foreach (Client c in clients) {
-                    if (c != client) {
-                        client.SendData(220, Encoding.Unicode.GetBytes(c.username));
-                    }
-                    c.SendData(220, Encoding.Unicode.GetBytes(client.username));
+
+                if (clients.Count + waitingClients.Count >= 256) {
+                    client.CloseClient();
+                    continue;
                 }
 
-                Label lbl = new Label();
-                lbl.Text = client.username;
-                Program.form.tableLayoutPanel3.Controls.Add(lbl);
+                if (Program.form.gameStatus == 1)
+                    AddClient(client);
+                else
+                    waitingClients.Add(client);
+
             }
         }
 
-        // Dead client handling
+        // Client joining/leaving handling
         public static void RemoveClient(Client client) {
             client.CloseClient();
-            if (Program.form.gameStatus == 1)
+            
+            if (waitingClients.Contains(client))
+                waitingClients.Remove(client);
+            
+            else if (clients.Contains(client)) {
+                int index = clients.IndexOf(client);
+                SendAllClients(221, [(byte)index]);
+                Program.form.Invoke(Program.form.tableLayoutPanel3.GetControlFromPosition(0, index).Dispose);
                 clients.Remove(client);
-            else
-                deadClients.Add(client);
+                Debug.WriteLine($"removed {client.username}");
+            }
         }
-        public static void RemoveDeadClients() {
-            foreach (Client deadClient in deadClients)
-                RemoveClient(deadClient);
-            deadClients.Clear();
+        static void AddClient(Client client) {
+            clients.Add(client);
+            foreach (Client c in clients) {
+                if (c != client) {
+                    client.SendData(220, Encoding.Unicode.GetBytes(c.username));
+                }
+                c.SendData(220, Encoding.Unicode.GetBytes(client.username));
+            }
+
+            Label lbl = new Label();
+            lbl.Text = client.username;
+            Program.form.Invoke(() => Program.form.tableLayoutPanel3.Controls.Add(lbl));
+        }
+        public static void AddWaitingClients() {
+            foreach (Client client in waitingClients) {
+                AddClient(client);
+            }
+            waitingClients.Clear();
         }
 
         // Sending data to clients functions
@@ -437,7 +466,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             while (resourceCount < mapSize*3/2 && attempts-- > 0) {
                 Hexagon hex = map[random.Next(mapSize), random.Next(mapSize)];
 
-                if (hex.biome != 0 && hex.resource == -1 && !hex.FindNearbyResources()) {
+                if (hex.biome != 0 && hex.resource == -1 && !hex.FindNearbyResources() && !hex.village) {
                     hex.SetRandomResource();
                     
                     resourceCount++;
@@ -459,40 +488,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             GenerateResources();
         }
     
-        // Gameplay functions
-        static bool CheckForEnd() {
-            if (resourceCount == 0)
-                return true;
-
-            foreach (Client client in NetworkHandler.clients) {
-                if (client.settlerCount != 0)
-                    return false;
-            }
-
-            return true;
-        }
-        static void NextRound() {
-            if (Program.form.gameStatus == 2) {
-                Program.form.gameStatus = 3;
-                turn = NetworkHandler.clients[0];
-
-                foreach (Hexagon hex in map) {
-                    hex.resource = -1;
-                    if (!hex.village) {
-                        hex.settler = null;
-                        hex.village = false;
-                    }
-                }
-
-                NetworkHandler.SendAllClients(212);
-                int[] resourcePos = GenerateResources();
-                foreach (int pos in resourcePos) {
-                    NetworkHandler.SendHexUpdate(map[pos / mapSize, pos % mapSize], -1);
-                }
-            }
-            else if (Program.form.gameStatus == 3)
-                Program.form.FinishGame();
-        }
+        // Gameplay Functions
         public static void ChooseNextPlayer() {
             if (CheckForEnd())
                 NextRound();
@@ -510,6 +506,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     Client next = NetworkHandler.clients[index];
                     if (next.IsAlive() && next != turn) {
                         turn = next;
+                        NetworkHandler.SendAllClients(222, [(byte)index]);
                         break;
                     }
                 }
@@ -519,8 +516,6 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     Program.form.FinishGame();
             }
         }
-
-        // Update hex to place settler/village & send everyone hex update
         public static void PlaceSettler(Client client, int type, int y, int x) {
             if (turn == client && 0 <= x && x < mapSize && 0 <= y && y < mapSize) {
                 Hexagon hex = map[y, x];
@@ -541,7 +536,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     }
                 }
 
-                else if (type == 1 && hex.settler == client && !hex.village && client.villageCount > 0) {
+                else if (Program.form.gameStatus == 2 && type == 1 && hex.settler == client && !hex.village && client.villageCount > 0) {
                     client.villageCount--;
                     hex.village = true;
 
@@ -549,6 +544,57 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     ChooseNextPlayer();
                 }
             }
+        }
+
+        // End functions
+        static void NextRound() {
+            if (Program.form.gameStatus == 2) {
+                Program.form.gameStatus = 3;
+                ResetAllPlayers();
+                turn = NetworkHandler.clients[0];
+                NetworkHandler.SendAllClients(222, [0]);
+
+                List<Hexagon> villages = new List<Hexagon>();
+                foreach (Hexagon hex in map) {
+                    hex.resource = -1;
+                    if (hex.village)
+                        villages.Add(hex);
+                    else
+                        hex.settler = null;
+                }
+
+                NetworkHandler.SendAllClients(212);
+                int[] resourcePos = GenerateResources();
+                foreach (int pos in resourcePos)
+                    NetworkHandler.SendHexUpdate(map[pos / mapSize, pos % mapSize], -1);
+                
+                foreach (Hexagon hex in villages) {
+                    NetworkHandler.SendHexUpdate(hex, hex.village ? 1 : 0);
+                    Debug.WriteLine($"{hex.y} , {hex.x}");
+                }
+            }
+            else if (Program.form.gameStatus == 3)
+                Program.form.FinishGame();
+        }
+        static bool CheckForEnd() {
+            if (resourceCount == 0)
+                return true;
+
+            foreach (Client client in NetworkHandler.clients) {
+                if (client.settlerCount == 0)
+                    return true;
+            }
+
+            return false;
+        }
+        public static void ResetAllPlayers() {
+            foreach (Client client in NetworkHandler.clients)
+                client.Reset();
+        }
+
+        // ignore
+        static int GetPlayerScore(Client client) {
+            return -1;
         }
     }
 }
