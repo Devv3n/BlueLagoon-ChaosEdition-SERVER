@@ -1,10 +1,7 @@
-using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
+using System.DirectoryServices;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // "2-Dimensional Representation Of A 3-Dimensional Cross-Section Of A 4-Dimensional Cube"
 //      +___________+
@@ -48,26 +45,26 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public static class Logging {
         static StreamWriter sw = new StreamWriter("Log.txt");
 
+        // Logging functions
         public static void Log(string? message) {
             sw?.WriteLine($"<{CurrentTime()}> {message}");
         }
-
         public static void LogException(string? message) {
             sw?.WriteLine($"[{CurrentTime()}] {message}");
         }
+        static string CurrentTime() => DateTime.Now.ToString("HH:mm:ss");
 
         public static void CloseLog() {
             sw?.WriteLine($"|{CurrentTime()}| Goodbye!");
             sw?.Close();
         }
-
-        static string CurrentTime() => DateTime.Now.ToString("HH:mm:ss");
     }
 
 
+
     public class Client {
-        const int defaultSettlerCount = 5;
-        const int defaultVillageCount = 3;
+        #region Variables
+        public static int defaultSettlerCount;
         
         public bool alive = true;
         public TcpClient client;
@@ -77,26 +74,38 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         public int[] resourceCount = new int[6];
         public int settlerCount = defaultSettlerCount;
-        public int villageCount = defaultVillageCount;
+        public int villageCount = 3;
 
+        // temp variables for end score calculating
+        public int _score = 0;
+        public int _islandSettlerCount = 0;
+        public bool[] _uniqueIslands = new bool[8];
+        public int _linkedIslands = 0;
+        #endregion
+
+        #region Client Life Handling
         public Client(TcpClient client) {
+            // Essential client variables
             this.client = client;
             stream = client.GetStream();
 
+            // Username variable
             byte[] buffer = new byte[128];
             stream.Read(buffer, 0, buffer.Length);
             username = Encoding.Unicode.GetString(buffer);
 
+            // Color variable
             Random rng = new Random();
             color = Color.FromArgb(255, rng.Next(256), rng.Next(256), rng.Next(256));
 
+            // Start handling client
             Task.Run(HandleData);
-            Logging.Log($"New client '{username}'");
+            Logging.Log($"New client \"{username}\"");
         }
-
-        // Attempts to send a length of 0 byte array and if no errors then client probablyyy still connected
+        
         public bool IsAlive() {
             if (alive) {
+                // Attempts to send a length of 0 byte array and if no errors then client probablyyy still connected
                 try {
                     bool blockingState = client.Client.Blocking;
                     try {
@@ -121,7 +130,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             else
                 return false;
         }
-
+        
         public void CloseClient() {
             if (alive) {
                 alive = false;
@@ -132,17 +141,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 if (Program.form.gameStatus != 1 && GameHandler.turn == this)
                     GameHandler.ChooseNextPlayer();
 
-                Logging.Log($"Client '{username}' left");
+                Logging.Log($"Client \'{username}\' left");
             }
         }
-        
-        // Data handling (sending/reading) functions
-        public void SendData(byte type, byte[]? data) {
+        #endregion
+
+        #region Data Handling Functions
+        public void SendData(byte type, byte[] data) {
             if (alive) {
                 try {
                     stream.WriteByte(type);
-                    if (data != null)
-                        stream.Write(data);
+                    stream.Write(data);
                 }
                 catch {
                     CloseClient();
@@ -166,8 +175,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 return -1;
             }
         }
+        #endregion
 
-        // Gameplay Functions
+        #region Gameplay Functions
         async void HandleData() {
             while (alive) {
                 int dataType = ReadByte();
@@ -202,21 +212,24 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public void Reset() {
             resourceCount = new int[6];
             settlerCount = defaultSettlerCount;
-            villageCount = defaultVillageCount;
+            villageCount = 3;
         }
+        #endregion
     }
 
     public static class NetworkHandler {
+        #region Variables
         public static List<Client> clients = new List<Client>();
         static List<Client> waitingClients = new List<Client>();
         static TcpListener server;
+        #endregion
 
+        #region Basic Server Functionality
         public static void StartServer(int port) {
             server = new TcpListener(IPAddress.Any, port);
             server.Start();
             HandleConnections();
         }
-
         static async void HandleConnections() {
             while (true) {
                 Client client = new Client(await server.AcceptTcpClientAsync());
@@ -233,8 +246,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             }
         }
+        #endregion
 
-        // Client joining/leaving handling
+        #region Client Joining/Leaving Handling
         public static void RemoveClient(Client client) {
             client.CloseClient();
             
@@ -246,7 +260,6 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 SendAllClients(221, [(byte)index]);
                 Program.form.Invoke(Program.form.tableLayoutPanel3.GetControlFromPosition(0, index).Dispose);
                 clients.Remove(client);
-                Debug.WriteLine($"removed {client.username}");
             }
         }
         static void AddClient(Client client) {
@@ -268,12 +281,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
             waitingClients.Clear();
         }
+        #endregion
 
-        // Sending data to clients functions
-        public static void SendAllClients(byte type) {
-            foreach (Client client in clients)
-                client.SendData(type, null);
-        }
+        #region Sending Data Functions
         public static void SendAllClients(byte type, byte[] data) {
             foreach (Client client in clients)
                 client.SendData(type, data);
@@ -303,11 +313,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     SendAllClients(211, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
             }
         }
+        #endregion
     }
 
 
 
     public class Hexagon(int biome, int y, int x) {
+        #region Variables
         // Const references
         public static readonly int[][] hexOffsets0 = [[-1, -1], [-1, 0], [0, 1], [1, 0], [1, -1], [0, -1]];
         public static readonly int[][] hexOffsets1 = [[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [0, -1]];
@@ -319,10 +331,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public int x = x;
         public int biome = biome;
         public int resource = -1;
+        public int island;
+
         public Client? settler;
         public bool village = false;
+        #endregion
 
-        // Hex configuring functions
+        #region Hex Random Resource Generation
         public void SetRandomResource() {
             int[] resourceTypes = biomeResourceTypes[biome - 1];
             while (true) {
@@ -345,8 +360,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 break;
             }
         }
+        #endregion
 
-        // Search neighbouring hexes functions
+        #region Search Neighbouring Hexes Functions
         static bool WithinMapBounds(int y, int x) => 0 <= y && y < GameHandler.mapSize && 0 <= x && x < GameHandler.mapSize;
         public bool FindNearbyResources() {
             foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1) 
@@ -369,9 +385,11 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             return false;
         }
+        #endregion
     }
 
     public static class GameHandler {
+        #region Variables
         // Const referneces
         public static readonly FastNoiseLite noise = new FastNoiseLite();
         static readonly Random random = new Random();
@@ -379,13 +397,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         // Map configuration
         public static int mapSize;
         public static Hexagon[,] map;
-        static List<List<int>>? islands;
+        static List<List<Hexagon>> islands;
     
         // Game Configuration
         public static Client? turn;
         static int? resourceCount;
+        static int? resourceTypes;
+        #endregion
 
-        // Functions for generating map
+        #region Map Generation Functions
         static void GenerateMap() {
             int xOffset = random.Next(-10000, 10000);
             int yOffset = random.Next(-10000, 10000);
@@ -396,9 +416,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
-        static List<List<int>> DetectIslands() {
+        static void DetectIslands() {
             bool[,] searched = new bool[mapSize, mapSize];
-            islands = new List<List<int>>();
+            islands = new List<List<Hexagon>>();
 
             for (int y = 0; y < mapSize; y++) {
                 for (int x = 0; x < mapSize; x++) {
@@ -407,7 +427,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         continue;
                     }
 
-                    List<int> islandPos = new List<int>();
+                    List<Hexagon> hexes = new List<Hexagon>();
 
                     void SearchNearby(int y, int x) {
                         if (0 <= y && y < mapSize && 0 <= x && x < mapSize && !searched[y, x]) {
@@ -415,52 +435,57 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                             if (map[y, x].biome == 0)
                                 return;
 
-                            islandPos.Add(y * mapSize + x);
+                            hexes.Add(map[y, x]);
                             foreach (int[] o in (y % 2 == 0 ? Hexagon.hexOffsets0 : Hexagon.hexOffsets1))
                                 SearchNearby(y + o[0], x + o[1]);
                         }
                     }
 
                     SearchNearby(y, x);
-                    islands.Add(islandPos);
+                    islands.Add(hexes);
 
                 }
             }
-
-            return islands;
         }
-        static bool ValidateIslands(List<List<int>> islands) {
+        static bool ValidateIslands() {
             int bigIslandCount = 0;
-            List<List<int>> removeIslands = new List<List<int>>();
+            List<List<Hexagon>> removeIslands = new List<List<Hexagon>>();
 
-            foreach (List<int> island in islands) {
+            foreach (List<Hexagon> island in islands) {
                 if (island.Count > (mapSize/3))
                     bigIslandCount++;
                 else {
-                    foreach (int hex in island)
-                        map[hex / mapSize, hex % mapSize].biome = 0;
+                    foreach (Hexagon hex in island)
+                        hex.biome = 0;
                     removeIslands.Add(island);
                 }
             }
 
-            foreach (List<int> island in removeIslands)
+            foreach (List<Hexagon> island in removeIslands)
                 islands.Remove(island);
 
             if (bigIslandCount == 8 && islands.Count == 8)
                 return true;
             return false;
         }
-        static void SetIslandBiomes(List<List<int>> islands) {
-            foreach (List<int> island in islands) {
+        static void SetIslandBiomes() { // Also assigns island variable to hexagons
+            int index = 0;
+
+            foreach (List<Hexagon> island in islands) {
                 int biome = random.Next(1, 4);
 
-                foreach (int hex in island)
-                    map[hex / mapSize, hex % mapSize].biome = biome;
+                foreach (Hexagon hex in island) {
+                    hex.biome = biome;
+                    hex.island = index;
+                }
+
+                index++;
             }
         }
-        static int[] GenerateResources() {
+        static Hexagon[] GenerateResources() {
             resourceCount = 0;
-            List<int> resourcePos = new List<int>();
+            bool[] uniqueResources = new bool[7];
+            List<Hexagon> resources = new List<Hexagon>();
             
             int attempts = mapSize * mapSize;
             while (resourceCount < mapSize*3/2 && attempts-- > 0) {
@@ -468,27 +493,37 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                 if (hex.biome != 0 && hex.resource == -1 && !hex.FindNearbyResources() && !hex.village) {
                     hex.SetRandomResource();
-                    
+
+                    if (hex.resource != 0)
+                        uniqueResources[hex.resource - 1] = true;
+
                     resourceCount++;
-                    resourcePos.Add(hex.y * mapSize + hex.x);
+                    resources.Add(hex);
                 }
             }
+
+            resourceTypes = 0;
+            foreach (bool resourceType in uniqueResources)
+                if (resourceType)
+                    resourceTypes++;
+
             
             Logging.Log($"Generated {resourceCount}/{mapSize * 3 / 2} resources");
-            return resourcePos.ToArray();
+            return resources.ToArray();
         }
         public static void MakeMap(int size) {
             mapSize = size;
             map = new Hexagon[mapSize, mapSize];
             do {
                 GenerateMap();
-                islands = DetectIslands();
-            } while (!ValidateIslands(islands));
-            SetIslandBiomes(islands);
+                DetectIslands();
+            } while (!ValidateIslands());
+            SetIslandBiomes();
             GenerateResources();
         }
-    
-        // Gameplay Functions
+        #endregion
+
+        #region Gameplay Functions
         public static void ChooseNextPlayer() {
             if (CheckForEnd())
                 NextRound();
@@ -545,11 +580,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
+        #endregion
 
-        // End functions
-        static void NextRound() {
+        #region End Functions
+        static async void NextRound() {
             if (Program.form.gameStatus == 2) {
                 Program.form.gameStatus = 3;
+
                 ResetAllPlayers();
                 turn = NetworkHandler.clients[0];
                 NetworkHandler.SendAllClients(222, [0]);
@@ -563,15 +600,16 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         hex.settler = null;
                 }
 
-                NetworkHandler.SendAllClients(212);
-                int[] resourcePos = GenerateResources();
-                foreach (int pos in resourcePos)
-                    NetworkHandler.SendHexUpdate(map[pos / mapSize, pos % mapSize], -1);
+                NetworkHandler.SendAllClients(212, GetPlayerScores());
+                Hexagon[] resourcePos = GenerateResources();
+                foreach (Hexagon hex in resourcePos)
+                    NetworkHandler.SendHexUpdate(hex, -1);
                 
                 foreach (Hexagon hex in villages) {
                     NetworkHandler.SendHexUpdate(hex, hex.village ? 1 : 0);
-                    Debug.WriteLine($"{hex.y} , {hex.x}");
                 }
+
+                await Task.Delay(5000);
             }
             else if (Program.form.gameStatus == 3)
                 Program.form.FinishGame();
@@ -592,9 +630,139 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 client.Reset();
         }
 
-        // ignore
-        static int GetPlayerScore(Client client) {
-            return -1;
+        public static byte[] GetPlayerScores() {
+            // Reset clients' temp score variables + calculate score from resources
+            foreach (Client client in NetworkHandler.clients) {
+                // Reset values
+                client._score = 0;
+                client._islandSettlerCount = 0;
+                client._uniqueIslands = new bool[8];
+                client._linkedIslands = 0;
+
+                // Resource score
+                int uniqueResources = 0;
+                foreach (int count in client.resourceCount.Skip(1)) {
+                    if (count > 0)
+                        uniqueResources++;
+
+                    if (count >= 2)
+                        client._score += 60 * (int)Math.Pow(2, count-1) / mapSize; 
+                }
+
+                // Statuette score
+                client._score += 65 / mapSize * client.resourceCount[0];
+
+                // Score if player has all available resource types
+                if (uniqueResources == resourceTypes)
+                    client._score += 10;
+            }
+
+            // Island domination calculation
+            int islandIndex = 0;
+            foreach (List<Hexagon> island in islands) {
+                // Count amount of settlers each player has on the island
+                foreach (Hexagon hex in island) {
+                    if (hex.settler != null) {
+                        hex.settler._uniqueIslands[islandIndex] = true; // declare they have a settler on this island (used in next calculation)
+                        hex.settler._islandSettlerCount++;
+                    }
+                }
+
+                // Find person with most settlers on the island
+                Client dominant = NetworkHandler.clients[0];
+                bool draw = false;
+                foreach (Client client in NetworkHandler.clients) {
+                    dominant = client._islandSettlerCount > dominant._islandSettlerCount ? client : dominant;
+                    draw = client._islandSettlerCount == dominant._islandSettlerCount;
+                }
+
+                // Add score to dominant player
+                if (!draw)
+                    dominant._score += island.Count * 20 / mapSize;
+
+                // Reset settler count on island for each player
+                foreach (Client client in NetworkHandler.clients)
+                    client._islandSettlerCount = 0;
+
+                islandIndex++;
+            }
+
+            // Unique islands settled on calculation
+            foreach (Client client in NetworkHandler.clients) {
+                // Count amount of islands client has been on
+                int uniqueIslands = 0;
+                foreach (bool island in client._uniqueIslands)
+                    if (island)
+                        uniqueIslands++;
+
+                // Add score if sufficient unique islands
+                if (uniqueIslands == 8)
+                    client._score += 20;
+                else if (uniqueIslands == 7)
+                    client._score += 10;
+            }
+
+            // Islands linked calculation
+            bool[,] searched = new bool[mapSize, mapSize];
+            for (int y = 0; y < mapSize; y++) {
+                for (int x = 0; x < mapSize; x++) {
+                    if (searched[y, x])
+                        continue;
+
+                    Client? searchSettler = map[y, x].settler;
+                    void SearchNearby(int y, int x) {
+                        if (0 <= y && y < mapSize && 0 <= x && x < mapSize) {
+                            Hexagon hex = map[y, x];
+                            Client? settler = hex.settler;
+                            bool searchingFor = settler == searchSettler;
+
+                            if (settler == null)
+                                searched[y, x] = true;
+                            else if (!searched[y, x] && searchingFor) {
+                                searched[y, x] = true;
+                                settler._uniqueIslands[hex.island] = true;
+                                foreach (int[] o in (y % 2 == 0 ? Hexagon.hexOffsets0 : Hexagon.hexOffsets1))
+                                    SearchNearby(y + o[0], x + o[1]);
+                            }
+                        }
+                    }
+
+                    if (searchSettler != null) {
+                        searchSettler._uniqueIslands = new bool[8];
+                        SearchNearby(y, x);
+
+                        // Count number of linked islands
+                        int linkedIslands = 0;
+                        foreach (bool island in searchSettler._uniqueIslands) {
+                            if (island)
+                                linkedIslands++;
+                        }
+
+                        // Determine whether there were more islands linked
+                        if (linkedIslands > searchSettler._linkedIslands)
+                            searchSettler._linkedIslands = linkedIslands;
+                    }
+                    else
+                        searched[y, x] = true;
+                }
+            }
+            foreach (Client client in NetworkHandler.clients) { // Scoring
+                if (client._linkedIslands >= 2)
+                    client._score += client._linkedIslands * 5;
+            }
+
+
+            // Put data into a byte[] to send over network
+            byte[] scores = new byte[NetworkHandler.clients.Count * 2];
+
+            int i = 0;
+            foreach (Client client in NetworkHandler.clients) {
+                scores[i]   = (byte)(client._score / 256);
+                scores[i++] = (byte)(client._score % 256);
+            }
+
+            return scores;
         }
+        #endregion
     }
 }

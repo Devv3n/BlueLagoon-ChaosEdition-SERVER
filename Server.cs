@@ -18,15 +18,36 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
+        // Game beginning & end handlers
+        public void StartGame() {
+            // Input sanitisation to limit a number
+            int mapSize = int.Parse(MapSizeBox.Text);
+            if (mapSize < 10)
+                mapSize = 10;
+            else if (mapSize > 255)
+                mapSize = 255;
+            MapSizeBox.Text = mapSize.ToString();
+
+            // Set up game
+            GameHandler.MakeMap(mapSize);
+            Client.defaultSettlerCount = 5 * mapSize / NetworkHandler.clients.Count;
+
+            GameHandler.ResetAllPlayers();
+            GameHandler.turn = NetworkHandler.clients[0];
+            NetworkHandler.SendAllClients(222, [0]);
+
+            NetworkHandler.SendMap();
+        }
         public void FinishGame() {
             gameStatus = 1;
             GameHandler.ResetAllPlayers();
-            NetworkHandler.SendAllClients(213);
+            NetworkHandler.SendAllClients(213, GameHandler.GetPlayerScores());
 
             Invoke(() => ServerButton.Text = "Start Game");
             NetworkHandler.AddWaitingClients();
         }
 
+        // Scaling UI
         private void Form_Resize(object sender, EventArgs e) {
             float scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
 
@@ -35,6 +56,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             ServerPortBox.Top = (ServerPortBoxBackground.Height - ServerPortBox.Height) / 2;
         }
 
+        // Main button handling
         private void ServerButton_Click(object sender, EventArgs e) {
             switch (gameStatus) {
                 // Start server
@@ -45,8 +67,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         }
                         else {
                             try {
-                                FinishGame();
+                                gameStatus = 1;
                                 NetworkHandler.StartServer(port);
+                                ServerButton.Text = "Start Game";
                                 ServerPortBox.Enabled = false;
                                 SaveConfig();
                                 Logging.Log("Server started");
@@ -65,10 +88,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         if (NetworkHandler.clients.Count >= 2) {
                             gameStatus = 2;
                             ServerButton.Text = "...";
-                            GameHandler.MakeMap(int.Parse(MapSizeBox.Text));
-                            GameHandler.turn = NetworkHandler.clients[0];
-                            NetworkHandler.SendAllClients(222, [0]);
-                            NetworkHandler.SendMap();
+                            StartGame();
                             Logging.Log($"Game started with map size {GameHandler.mapSize}");
                         }
                         else {
@@ -88,15 +108,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
-        // Input validation of map size in a way I don't particularly like but i dont care :P
-        // This also includes configuration saving
+        // Partial input sanitisation (ensure a number is entered)
+        string previousText = "";
         private void MapSizeBox_TextChanged(object sender, EventArgs e) {
-            if (!int.TryParse(MapSizeBox.Text, out int size))
-                MapSizeBox.Text = "14";
-            else if (size > 255)
-                MapSizeBox.Text = "255";
-            else if (size < 10)
-                MapSizeBox.Text = "10";
+            if (!int.TryParse(MapSizeBox.Text, out _))
+                MapSizeBox.Text = previousText;
+            else
+                previousText = MapSizeBox.Text;
 
             SaveConfig();
         }
