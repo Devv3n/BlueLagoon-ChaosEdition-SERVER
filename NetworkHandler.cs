@@ -227,12 +227,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
 
             // Add to server's player list
-            Label lbl = new Label();
-            lbl.Text = client.username;
-            Program.form.Invoke(() => Program.form.tableLayoutPanel3.Controls.Add(lbl));
+            Program.form.Invoke(Program.form.AddPlayer, client);
 
-            client.SendData(240, [2]); // Servers joined statistic
+            // Servers joined statistic
+            client.SendData(240, [2]);
         }
+
         public static void AddWaitingClients() {
             foreach (Client client in waitingClients) {
                 AddClient(client);

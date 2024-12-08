@@ -117,6 +117,42 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         #endregion
 
+        #region Player List Handling
+        public void AddPlayer(Client client) {
+            // Setup label
+            Label lbl = new Label();
+            lbl.Text = client.username;
+            lbl.Tag = client;
+
+            // Interactive properties setup
+            lbl.MouseEnter += PlayerText_MouseEnter;
+            lbl.MouseLeave += PlayerText_MouseLeave;
+            lbl.Click += PlayerText_Click;
+            
+            // Display label
+            tableLayoutPanel3.Controls.Add(lbl);
+         }
+
+        private void PlayerText_Click(object? sender, EventArgs e) {
+            if (sender is Label lbl && lbl.Tag is Client client)
+                client.CloseClient();
+        }
+
+        private void PlayerText_MouseEnter(object? sender, EventArgs e) {
+            if (sender is Label lbl) {
+                lbl.ForeColor = Color.Red;
+                lbl.Font = new Font(lbl.Font, FontStyle.Strikeout);
+            }
+        }
+
+        private void PlayerText_MouseLeave(object? sender, EventArgs e) {
+            if (sender is Label lbl) {
+                lbl.ForeColor = Color.Black;
+                lbl.Font = new Font(lbl.Font, FontStyle.Regular);
+            }
+        }
+        #endregion
+
         void SaveConfig() {
             using (StreamWriter file = new StreamWriter("config.txt", false)) {
                 file.WriteLine(ServerPortBox.Text);
