@@ -19,6 +19,7 @@
 namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     internal static class Program {
         public static Server form = new Server();
+        public static int gameStatus = 0; //0-noServer 1-noMap 2/3-gamingStage
 
         [STAThread]
         static void Main() {

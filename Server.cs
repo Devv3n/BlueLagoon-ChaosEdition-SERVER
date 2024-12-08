@@ -1,11 +1,10 @@
 namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public partial class Server : Form {
-        public int gameStatus = 0; //0-noServer 1-noMap 2/3-gamingStage
 
         public Server() {
             InitializeComponent(); // wat dis
 
-            // Configuration loading
+            #region Configuration loading
             if (File.Exists("config.txt")) {
                 string[] text = File.ReadAllLines("config.txt");
 
@@ -16,9 +15,10 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         MapSizeBox.Text = text[1].Length > 3 ? text[1][..3] : text[1];
                 }
             }
+            #endregion
         }
 
-        // Game beginning & end handlers
+        #region Game Beginning/End Handling
         public void StartGame() {
             // Input sanitisation to limit a number
             int mapSize = int.Parse(MapSizeBox.Text);
@@ -43,12 +43,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             NetworkHandler.SendScores();
             GameHandler.ResetAllPlayers(true);
 
-            gameStatus = 1;
+            Program.gameStatus = 1;
             Invoke(() => ServerButton.Text = "Start Game");
+            Invoke(() => MapSizeBox.Enabled = true);
             NetworkHandler.AddWaitingClients();
         }
+        #endregion
 
-        // Scaling UI
+        #region Scaling UI
         private void Form_Resize(object sender, EventArgs e) {
             float scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
 
@@ -56,27 +58,34 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             ServerPortBox.Font = new Font(ServerPortBox.Font.FontFamily, 23f * scale);
             ServerPortBox.Top = (ServerPortBoxBackground.Height - ServerPortBox.Height) / 2;
         }
+        #endregion
 
-        // Main button handling
+        #region Main button handling
         private void ServerButton_Click(object sender, EventArgs e) {
-            switch (gameStatus) {
+            switch (Program.gameStatus) {
                 // Start server
                 case 0: {
-                        if (!int.TryParse(ServerPortBox.Text, out int port)) {
+                        // Invalid port entered
+                        if (!int.TryParse(ServerPortBox.Text, out int port) || 0 > port || port > 65565) {
                             MessageBox.Show($"Invalid port entered!", "bad port", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             Logging.LogException($"Invalid port '{ServerPortBox.Text}'");
                         }
+
                         else {
+                            // Start server
                             try {
-                                gameStatus = 1;
+                                Program.gameStatus = 1;
                                 NetworkHandler.StartServer(port);
+
                                 ServerButton.Text = "Start Game";
                                 ServerPortBox.Enabled = false;
+
                                 SaveConfig();
                                 Logging.Log("Server started");
                             }
+                            // Unhandled exception starting server??
                             catch (Exception ex) {
-                                gameStatus = 0;
+                                Program.gameStatus = 0;
                                 MessageBox.Show(ex.Message, "erawrrrr", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 Logging.LogException(ex.Message);
                             }
@@ -86,12 +95,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                 // Start game
                 case 1: {
+                        // Check if sufficient player count (at least 2)
                         if (NetworkHandler.clients.Count >= 2) {
-                            gameStatus = 2;
+                            Program.gameStatus = 2;
                             ServerButton.Text = "...";
+                            MapSizeBox.Enabled = false;
+
                             StartGame();
                             Logging.Log($"Game started with map size {GameHandler.mapSize}");
                         }
+
+                        // Error if less than 2 players
                         else {
                             MessageBox.Show("Not enough players to start the game!", "erawrrrr", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             Logging.LogException($"Lack of players ({2 - NetworkHandler.clients.Count} more needed)");
@@ -101,6 +115,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     }
             }
         }
+        #endregion
 
         void SaveConfig() {
             using (StreamWriter file = new StreamWriter("config.txt", false)) {
@@ -109,15 +124,25 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
-        // Partial input sanitisation (ensure a number is entered)
-        string previousText = "";
+        #region Partial input sanitisation (ensure a number is entered)
+        string previousPortBoxText = "";
+        private void ServerPortBox_TextChanged(object sender, EventArgs e) {
+            if (!int.TryParse(ServerPortBox.Text, out _))
+                ServerPortBox.Text = previousPortBoxText;
+            else
+                previousPortBoxText = ServerPortBox.Text;
+        }
+
+        string previousMapSizeText = "";
         private void MapSizeBox_TextChanged(object sender, EventArgs e) {
             if (!int.TryParse(MapSizeBox.Text, out _))
-                MapSizeBox.Text = previousText;
+                MapSizeBox.Text = previousMapSizeText;
             else
-                previousText = MapSizeBox.Text;
+                previousMapSizeText = MapSizeBox.Text;
 
             SaveConfig();
         }
+        #endregion
+
     }
 }

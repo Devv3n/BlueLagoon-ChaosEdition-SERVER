@@ -5,14 +5,17 @@ using System.Text;
 namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public class Client {
         #region Variables
+        // Const reference
         public static int defaultSettlerCount;
 
+        // Client Configuration
         public bool alive = true;
         public TcpClient client;
         public NetworkStream stream;
         public string username;
         public Color color;
 
+        // Gameplay Variables
         public int[] resourceCount = new int[6];
         public int settlerCount = defaultSettlerCount;
         public int villageCount = 3;
@@ -75,12 +78,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         public void CloseClient() {
             if (alive) {
+                // Shutdown Client
                 alive = false;
                 stream?.Close();
                 client?.Close();
                 NetworkHandler.RemoveClient(this);
 
-                if (Program.form.gameStatus != 1 && GameHandler.turn == this)
+                // Choose next player if mid-game and their turn
+                if (Program.gameStatus != 1 && GameHandler.turn == this)
                     GameHandler.ChooseNextPlayer();
 
                 Logging.Log($"Client \'{username}\' left");
@@ -100,12 +105,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
-        void ReadBuffer(byte[] buffer) {
+        bool ReadBuffer(byte[] buffer) {
             try {
                 stream.Read(buffer, 0, buffer.Length);
+                return true;
             }
             catch {
                 CloseClient();
+                return false;
             }
         }
         int ReadByte() {
@@ -127,8 +134,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     // hex click
                     case 200: {
                             byte[] data = new byte[3]; // type, y, x
-                            ReadBuffer(data);
-                            GameHandler.PlaceSettler(this, data[0], data[1], data[2]);
+                            if (ReadBuffer(data) && (Program.gameStatus == 2 || Program.gameStatus == 3))
+                                GameHandler.PlaceSettler(this, data[0], data[1], data[2]);
 
                             break;
                         }
@@ -151,6 +158,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
+        
+        // Resets gameplay variables making them ready for next round
         public void Reset() {
             resourceCount = new int[6];
             settlerCount = defaultSettlerCount;
@@ -160,7 +169,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     }
 
     public static class NetworkHandler {
-        #region Variables
+        #region Server Variables
         public static List<Client> clients = new List<Client>();
         static List<Client> waitingClients = new List<Client>();
         static TcpListener server;
@@ -176,12 +185,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             while (true) {
                 Client client = new Client(await server.AcceptTcpClientAsync());
 
+                // Game full (256 players) - kick client
                 if (clients.Count + waitingClients.Count >= 256) {
                     client.CloseClient();
                     continue;
                 }
-
-                if (Program.form.gameStatus == 1)
+                
+                // Add client depending whether currently a game is being played
+                if (Program.gameStatus == 1)
                     AddClient(client);
                 else
                     waitingClients.Add(client);
@@ -206,6 +217,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         static void AddClient(Client client) {
             clients.Add(client);
+
+            // Add to everyones' player lists
             foreach (Client c in clients) {
                 if (c != client) {
                     client.SendData(220, Encoding.Unicode.GetBytes(c.username));
@@ -213,11 +226,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 c.SendData(220, Encoding.Unicode.GetBytes(client.username));
             }
 
+            // Add to server's player list
             Label lbl = new Label();
             lbl.Text = client.username;
             Program.form.Invoke(() => Program.form.tableLayoutPanel3.Controls.Add(lbl));
 
-            client.SendData(240, [2]); // Servers joined tatistic
+            client.SendData(240, [2]); // Servers joined statistic
         }
         public static void AddWaitingClients() {
             foreach (Client client in waitingClients) {
@@ -234,6 +248,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
 
         public static void SendMap() {
+            // Create buffers of data to send
             List<Hexagon> resourceHexes = new List<Hexagon>();
             byte[] buffer = new byte[GameHandler.map.Length];
 
@@ -244,9 +259,11 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     resourceHexes.Add(hex);
             }
 
+            // Send map
             foreach (Client client in clients)
                 client.SendData(210, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
 
+            // Send hex resources (if any) of each hex
             foreach (Hexagon hex in resourceHexes)
                 SendHexUpdate(hex, -1);
         }
@@ -254,42 +271,43 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             if (hex != null) {
                 if (type == 0 || type == 1) // settler || village
                     SendAllClients(211, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
-                else // any value not settler || village
+                else // any value !(settler || village)
                     SendAllClients(211, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
             }
         }
 
         public static void SendScores() {
-            int[] scores = GameHandler.GetPlayerScores();
-
-            // Send scores
+            GameHandler.CalculatePlayerScores();
+            
+            List<Client> largestScores = new List<Client>([clients[0]]);
             byte[] byteScores = new byte[clients.Count * 2];
+
             int i = 0;
-            foreach (Client client in NetworkHandler.clients) {
-                scores[i] = (byte)(client._score / 256);
-                scores[i++] = (byte)(client._score % 256);
+            foreach (Client client in clients) {
+                int score = client._score;
+                
+                // Byte[] for sending scores over network
+                byteScores[i++] = (byte)(client._score / 256);
+                byteScores[i++] = (byte)(client._score % 256);
+
+                // Find largest score
+                bool isEqualOrMore = score >= largestScores[0]._score;
+                if (score > largestScores[0]._score)
+                    largestScores.Clear();
+                if (isEqualOrMore)
+                    largestScores.Add(client);
             }
+ 
+            // Send scores
             SendAllClients(212, byteScores);
 
-            // Find largest scores
-            i = 0;
-            List<int> largestScores = new List<int>(scores[0]);
-            foreach (int score in scores) {
-                if (score > largestScores[0])
-                    largestScores.Clear();
-                if (score >= largestScores[0])
-                    largestScores.Add(i);
-
-                i++;
-            }
 
             // Statistics win/lose sending
-            i = 0;
             foreach (Client client in clients) {
-                if (largestScores.Contains(i++))
-                    client.SendData(240, [(byte)(Program.form.gameStatus == 2 ? 4 : 6)]); // win
+                if (largestScores.Contains(client))
+                    client.SendData(240, [(byte)(Program.gameStatus == 2 ? 4 : 6)]); // win
                 else
-                    client.SendData(240, [(byte)(Program.form.gameStatus == 2 ? 5 : 7)]); // lose
+                    client.SendData(240, [(byte)(Program.gameStatus == 2 ? 5 : 7)]); // lose
             }
         }
         #endregion

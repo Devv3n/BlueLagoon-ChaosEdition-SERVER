@@ -191,6 +191,7 @@
             ServerPortBox.Text = "60420";
             ServerPortBox.TextAlign = HorizontalAlignment.Center;
             ServerPortBox.WordWrap = false;
+            ServerPortBox.TextChanged += ServerPortBox_TextChanged;
             // 
             // Server
             // 
