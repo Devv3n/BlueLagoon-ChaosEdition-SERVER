@@ -1,3 +1,4 @@
+using System.Configuration;
 using System.DirectoryServices;
 using System.Net;
 using System.Net.Sockets;
@@ -75,6 +76,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public int[] resourceCount = new int[6];
         public int settlerCount = defaultSettlerCount;
         public int villageCount = 3;
+        public bool villagePlaced = false;
 
         // temp variables for end score calculating
         public int _score = 0;
@@ -274,6 +276,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             Label lbl = new Label();
             lbl.Text = client.username;
             Program.form.Invoke(() => Program.form.tableLayoutPanel3.Controls.Add(lbl));
+
+            client.SendData(240, [2]); // Servers joined tatistic
         }
         public static void AddWaitingClients() {
             foreach (Client client in waitingClients) {
@@ -288,6 +292,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             foreach (Client client in clients)
                 client.SendData(type, data);
         }
+        
         public static void SendMap() {
             List<Hexagon> resourceHexes = new List<Hexagon>();
             byte[] buffer = new byte[GameHandler.map.Length];
@@ -311,6 +316,40 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     SendAllClients(211, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
                 else // any value not settler || village
                     SendAllClients(211, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
+            }
+        }
+        
+        public static void SendScores() {
+            int[] scores = GameHandler.GetPlayerScores();
+            
+            // Send scores
+            byte[] byteScores = new byte[clients.Count * 2];
+            int i = 0;
+            foreach (Client client in NetworkHandler.clients) {
+                scores[i] = (byte)(client._score / 256);
+                scores[i++] = (byte)(client._score % 256);
+            }
+            SendAllClients(212, byteScores);
+
+            // Find largest scores
+            i = 0;
+            List<int> largestScores = new List<int>(scores[0]);
+            foreach (int score in scores) {
+                if (score > largestScores[0])
+                    largestScores.Clear();
+                if (score >= largestScores[0])
+                    largestScores.Add(i);
+                
+                i++;
+            }
+
+            // Statistics win/lose sending
+            i = 0;
+            foreach (Client client in clients) {
+                if (largestScores.Contains(i++))
+                    client.SendData(240, [(byte)(Program.form.gameStatus == 2 ? 4 : 6)]); // win
+                else
+                    client.SendData(240, [(byte)(Program.form.gameStatus == 2 ? 5 : 7)]); // lose
             }
         }
         #endregion
@@ -539,7 +578,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         loops++;
 
                     Client next = NetworkHandler.clients[index];
-                    if (next.IsAlive() && next != turn) {
+                    if (next.IsAlive() && next != turn && (Program.form.gameStatus == 2 || (Program.form.gameStatus == 3 && next.villagePlaced))) {
                         turn = next;
                         NetworkHandler.SendAllClients(222, [(byte)index]);
                         break;
@@ -565,8 +604,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                             client.resourceCount[hex.resource]++;
                             hex.resource = -1;
                         }
-                        
-                        NetworkHandler.SendHexUpdate(hex, 0);
+
+                        client.SendData(240, [0]);
+                        NetworkHandler.SendHexUpdate(hex, 0); // Settlers placed statistics
                         ChooseNextPlayer();
                     }
                 }
@@ -575,7 +615,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     client.villageCount--;
                     hex.village = true;
 
-                    NetworkHandler.SendHexUpdate(hex, 1);
+                    client.SendData(240, [1]);
+                    NetworkHandler.SendHexUpdate(hex, 1); // Villages placed statistics
                     ChooseNextPlayer();
                 }
             }
@@ -585,12 +626,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         #region End Functions
         static async void NextRound() {
             if (Program.form.gameStatus == 2) {
-                Program.form.gameStatus = 3;
+                NetworkHandler.SendScores();
 
-                ResetAllPlayers();
+                // Reset to default
+                ResetAllPlayers(false);
                 turn = NetworkHandler.clients[0];
                 NetworkHandler.SendAllClients(222, [0]);
 
+                // Find villages & clear map where no villages
                 List<Hexagon> villages = new List<Hexagon>();
                 foreach (Hexagon hex in map) {
                     hex.resource = -1;
@@ -600,16 +643,25 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         hex.settler = null;
                 }
 
-                NetworkHandler.SendAllClients(212, GetPlayerScores());
+                // Setup & send resources again for settlement phase
                 Hexagon[] resourcePos = GenerateResources();
                 foreach (Hexagon hex in resourcePos)
                     NetworkHandler.SendHexUpdate(hex, -1);
-                
+
+                // Send village locations
+                List<Client> villageless = new List<Client>(NetworkHandler.clients);
                 foreach (Hexagon hex in villages) {
                     NetworkHandler.SendHexUpdate(hex, hex.village ? 1 : 0);
+                    villageless.Remove(hex.settler);
                 }
 
+                // Statistic for people with no villages during settlement phase
+                foreach (Client client in villageless)
+                    client.SendData(240, [8]);
+
+                // Leaderboard delay
                 await Task.Delay(5000);
+                Program.form.gameStatus = 3;
             }
             else if (Program.form.gameStatus == 3)
                 Program.form.FinishGame();
@@ -625,12 +677,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             return false;
         }
-        public static void ResetAllPlayers() {
-            foreach (Client client in NetworkHandler.clients)
+        public static void ResetAllPlayers(bool full) {
+            foreach (Client client in NetworkHandler.clients) {
                 client.Reset();
+                if (full)
+                    client.villagePlaced = false;
+            }
         }
 
-        public static byte[] GetPlayerScores() {
+        public static int[] GetPlayerScores() {
             // Reset clients' temp score variables + calculate score from resources
             foreach (Client client in NetworkHandler.clients) {
                 // Reset values
@@ -753,15 +808,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
 
             // Put data into a byte[] to send over network
-            byte[] scores = new byte[NetworkHandler.clients.Count * 2];
-
-            int i = 0;
-            foreach (Client client in NetworkHandler.clients) {
-                scores[i]   = (byte)(client._score / 256);
-                scores[i++] = (byte)(client._score % 256);
-            }
-
-            return scores;
+            return NetworkHandler.clients.Select(client => client._score).ToArray();
+            
         }
         #endregion
     }

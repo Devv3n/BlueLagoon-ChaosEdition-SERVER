@@ -32,17 +32,18 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             GameHandler.MakeMap(mapSize);
             Client.defaultSettlerCount = 5 * mapSize / NetworkHandler.clients.Count;
 
-            GameHandler.ResetAllPlayers();
+            GameHandler.ResetAllPlayers(true);
             GameHandler.turn = NetworkHandler.clients[0];
             NetworkHandler.SendAllClients(222, [0]);
+            NetworkHandler.SendAllClients(240, [3]); // Games played statistic
 
             NetworkHandler.SendMap();
         }
         public void FinishGame() {
-            gameStatus = 1;
-            GameHandler.ResetAllPlayers();
-            NetworkHandler.SendAllClients(213, GameHandler.GetPlayerScores());
+            NetworkHandler.SendScores();
+            GameHandler.ResetAllPlayers(true);
 
+            gameStatus = 1;
             Invoke(() => ServerButton.Text = "Start Game");
             NetworkHandler.AddWaitingClients();
         }
