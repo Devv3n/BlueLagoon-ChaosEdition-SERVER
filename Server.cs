@@ -40,7 +40,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             NetworkHandler.SendMap();
         }
         public void FinishGame() {
-            NetworkHandler.SendScores();
+            NetworkHandler.SendScores(true);
             GameHandler.ResetAllPlayers(true);
 
             Program.gameStatus = 1;

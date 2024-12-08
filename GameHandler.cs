@@ -303,7 +303,7 @@
         #region End Functions
         static async void NextRound() {
             if (Program.gameStatus == 2) {
-                NetworkHandler.SendScores();
+                NetworkHandler.SendScores(false);
 
                 // Reset to default variables
                 ResetAllPlayers(false);

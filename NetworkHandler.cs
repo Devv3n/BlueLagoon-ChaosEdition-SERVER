@@ -276,7 +276,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
-        public static void SendScores() {
+        public static void SendScores(bool gameEnd) {
             GameHandler.CalculatePlayerScores();
             
             List<Client> largestScores = new List<Client>([clients[0]]);
@@ -299,7 +299,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
  
             // Send scores
-            SendAllClients(212, byteScores);
+            SendAllClients((byte)(gameEnd ? 213 : 212), byteScores);
 
 
             // Statistics win/lose sending
