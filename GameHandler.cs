@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
+﻿namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public class Hexagon(int biome, int y, int x) {
         #region Variables
         // Const references
@@ -211,7 +209,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 Hexagon[,] _map = new Hexagon[mapSize, mapSize];
 
                 while (!state.IsStopped) {
-                    // Generate things
+                    // Generate "things"
                     _map = GenerateMap(_map);
                     List<List<Hexagon>> _islands = DetectIslands(_map);
 
@@ -241,6 +239,10 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                 // Find next alive client
                 while (loops <= 1) {
+                    if (NetworkHandler.clients.Count == 0) {
+                        loops = 2;
+                        break;
+                    }
                     index = ++index % NetworkHandler.clients.Count;
                     
                     // Loop count calculator
@@ -258,7 +260,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                 // If the while loop did more than 1 loop around the client list then it means everyone is dead
                 if (loops > 1)
-                    Program.form.FinishGame();
+                    Program.form.FinishGame(false);
             }
         }
         public static void PlaceSettler(Client client, int type, int y, int x) {
@@ -282,6 +284,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                         // Send map/statistics update networking
                         client.SendData(240, [0]); // Settlers placed statistics
+                        NetworkHandler.SendCounterUpdate(client, 0);
                         NetworkHandler.SendHexUpdate(hex, 0);
 
                         ChooseNextPlayer();
@@ -296,6 +299,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                     // Send map/statistics update networking
                     client.SendData(240, [1]); // Villages placed statistics
+                    NetworkHandler.SendCounterUpdate(client, 1);
                     NetworkHandler.SendHexUpdate(hex, 1);
 
                     ChooseNextPlayer();
@@ -345,7 +349,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 Program.gameStatus = 3;
             }
             else if (Program.gameStatus == 3)
-                Program.form.FinishGame();
+                Program.form.FinishGame(true);
         }
         static bool CheckForEnd() {
             // No resources on map left

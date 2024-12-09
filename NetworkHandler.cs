@@ -243,7 +243,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         #region Sending Data Functions
         public static void SendAllClients(byte type, byte[] data) {
-            foreach (Client client in clients)
+            foreach (Client client in new List<Client>(clients))
                 client.SendData(type, data);
         }
 
@@ -276,6 +276,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
 
+        public static void SendCounterUpdate(Client client, int type) { // 0-settler 1-village 2-both
+            if (type == 0 || type == 2)
+                client.SendData(230, [0, (byte)(client.settlerCount / 256), (byte)(client.settlerCount % 256)]);
+            if (type == 1 || type == 2)
+                client.SendData(230, [1, (byte)(client.villageCount / 256), (byte)(client.villageCount % 256)]);
+        }
         public static void SendScores(bool gameEnd) {
             GameHandler.CalculatePlayerScores();
             
