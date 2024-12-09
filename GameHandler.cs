@@ -253,7 +253,7 @@
                     Client next = NetworkHandler.clients[index];
                     if (next.IsAlive() && next != turn && (Program.gameStatus == 2 || (Program.gameStatus == 3 && next.villagePlaced))) {
                         turn = next;
-                        NetworkHandler.SendAllClients(222, [(byte)index]);
+                        NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [(byte)index]);
                         break;
                     }
                 }
@@ -283,8 +283,8 @@
                         }
 
                         // Send map/statistics update networking
-                        client.SendData(240, [0]); // Settlers placed statistics
-                        NetworkHandler.SendCounterUpdate(client, 0);
+                        client.SendStatistic(StatisticsType.SettlersPlaced);
+                        client.SendCounterUpdate(0);
                         NetworkHandler.SendHexUpdate(hex, 0);
 
                         ChooseNextPlayer();
@@ -298,8 +298,8 @@
                     hex.village = true;
 
                     // Send map/statistics update networking
-                    client.SendData(240, [1]); // Villages placed statistics
-                    NetworkHandler.SendCounterUpdate(client, 1);
+                    client.SendStatistic(StatisticsType.VillagesPlaced);
+                    client.SendCounterUpdate(1);
                     NetworkHandler.SendHexUpdate(hex, 1);
 
                     ChooseNextPlayer();
@@ -316,7 +316,7 @@
                 // Reset to default variables
                 ResetAllPlayers(false);
                 turn = NetworkHandler.clients[0];
-                NetworkHandler.SendAllClients(222, [0]);
+                NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [0]);
 
                 // Find villages & clear map where no villages
                 List<Hexagon> villages = new List<Hexagon>();
@@ -342,7 +342,7 @@
 
                 // Statistic for people with no villages during settlement phase
                 foreach (Client client in villageless)
-                    client.SendData(240, [8]);
+                    client.SendStatistic(StatisticsType.SettlementPhasesUnplayable);
 
                 // Leaderboard delay
                 await Task.Delay(5000);

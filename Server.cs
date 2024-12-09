@@ -35,18 +35,18 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             GameHandler.turn = NetworkHandler.clients[0];
 
             // Send data
-            NetworkHandler.SendAllClients(222, [0]);
+            NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [0]);
             foreach (Client client in NetworkHandler.clients) {
-                NetworkHandler.SendCounterUpdate(client, 2);
+                client.SendCounterUpdate(2);
+                client.SendStatistic(StatisticsType.GamesPlayed);
             }
             NetworkHandler.SendMap();
-            NetworkHandler.SendAllClients(240, [3]); // Games played statistic
         }
         public void FinishGame(bool sendScores) {
             if (sendScores)
                 NetworkHandler.SendScores(true);
             else
-                NetworkHandler.SendAllClients(213, new byte[NetworkHandler.clients.Count * 2]);
+                NetworkHandler.SendAllClients(NetworkType.EndGame, new byte[NetworkHandler.clients.Count * 2]);
         
             GameHandler.ResetAllPlayers(true);
 

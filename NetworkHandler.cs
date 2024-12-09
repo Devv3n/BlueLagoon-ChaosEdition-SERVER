@@ -94,10 +94,10 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         #endregion
 
         #region Data Handling Functions
-        public void SendData(byte type, byte[] data) {
+        public void SendData(NetworkType type, byte[] data) {
             if (alive) {
                 try {
-                    stream.WriteByte(type);
+                    stream.WriteByte((byte)type);
                     stream.Write(data);
                 }
                 catch {
@@ -158,7 +158,19 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 }
             }
         }
-        
+
+        // Sends display update of settlers/vilalges count
+        public void SendCounterUpdate(int type) { // 0-settler 1-village 2-both
+            if (type == 0 || type == 2)
+                SendData(NetworkType.CounterUpdate, [0, (byte)(settlerCount / 256), (byte)(settlerCount % 256)]);
+            if (type == 1 || type == 2)
+                SendData(NetworkType.CounterUpdate, [1, (byte)(villageCount / 256), (byte)(villageCount % 256)]);
+        }
+        // Send call to increment a statistic
+        public void SendStatistic(StatisticsType statisticType) {
+            SendData(NetworkType.IncrementStatistic, [(byte)statisticType]);
+        }
+
         // Resets gameplay variables making them ready for next round
         public void Reset() {
             resourceCount = new int[6];
@@ -210,7 +222,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             else if (clients.Contains(client)) {
                 int index = clients.IndexOf(client);
-                SendAllClients(221, [(byte)index]);
+                SendAllClients(NetworkType.PlayerLeave, [(byte)index]);
                 Program.form.Invoke(Program.form.tableLayoutPanel3.GetControlFromPosition(0, index).Dispose);
                 clients.Remove(client);
             }
@@ -221,16 +233,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             // Add to everyones' player lists
             foreach (Client c in clients) {
                 if (c != client) {
-                    client.SendData(220, Encoding.Unicode.GetBytes(c.username));
+                    client.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(c.username));
                 }
-                c.SendData(220, Encoding.Unicode.GetBytes(client.username));
+                c.SendData(NetworkType.PlayerTurn, Encoding.Unicode.GetBytes(client.username));
             }
+
+            client.SendStatistic(StatisticsType.ServersJoined);
 
             // Add to server's player list
             Program.form.Invoke(Program.form.AddPlayer, client);
-
-            // Servers joined statistic
-            client.SendData(240, [2]);
         }
 
         public static void AddWaitingClients() {
@@ -242,7 +253,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         #endregion
 
         #region Sending Data Functions
-        public static void SendAllClients(byte type, byte[] data) {
+        public static void SendAllClients(NetworkType type, byte[] data) {
             foreach (Client client in new List<Client>(clients))
                 client.SendData(type, data);
         }
@@ -261,7 +272,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             // Send map
             foreach (Client client in clients)
-                client.SendData(210, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
+                client.SendData(NetworkType.SendMap, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
 
             // Send hex resources (if any) of each hex
             foreach (Hexagon hex in resourceHexes)
@@ -270,18 +281,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public static void SendHexUpdate(Hexagon hex, int type) {
             if (hex != null) {
                 if (type == 0 || type == 1) // settler || village
-                    SendAllClients(211, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
+                    SendAllClients(NetworkType.HexUpate, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
                 else // any value !(settler || village)
-                    SendAllClients(211, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
+                    SendAllClients(NetworkType.HexUpate, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
             }
         }
-
-        public static void SendCounterUpdate(Client client, int type) { // 0-settler 1-village 2-both
-            if (type == 0 || type == 2)
-                client.SendData(230, [0, (byte)(client.settlerCount / 256), (byte)(client.settlerCount % 256)]);
-            if (type == 1 || type == 2)
-                client.SendData(230, [1, (byte)(client.villageCount / 256), (byte)(client.villageCount % 256)]);
-        }
+        
         public static void SendScores(bool gameEnd) {
             GameHandler.CalculatePlayerScores();
             
@@ -305,15 +310,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
  
             // Send scores
-            SendAllClients((byte)(gameEnd ? 213 : 212), byteScores);
+            SendAllClients(gameEnd ? NetworkType.EndGame : NetworkType.ClearMap, byteScores);
 
 
             // Statistics win/lose sending
             foreach (Client client in clients) {
                 if (largestScores.Contains(client))
-                    client.SendData(240, [(byte)(Program.gameStatus == 2 ? 4 : 6)]); // win
+                    client.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesWon : StatisticsType.SettlementPhasesWon);
                 else
-                    client.SendData(240, [(byte)(Program.gameStatus == 2 ? 5 : 7)]); // lose
+                    client.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesLost : StatisticsType.SettlementPhasesLost);
             }
         }
         #endregion
