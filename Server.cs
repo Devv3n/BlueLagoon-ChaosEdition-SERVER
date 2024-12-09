@@ -96,7 +96,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 // Start game
                 case 1: {
                         // Check if sufficient player count (at least 2)
-                        if (NetworkHandler.clients.Count >= 2) {
+                        if (NetworkHandler.clients.Count >= 1) {
                             Program.gameStatus = 2;
                             ServerButton.Text = "...";
                             MapSizeBox.Enabled = false;

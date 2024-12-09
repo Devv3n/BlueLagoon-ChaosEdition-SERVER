@@ -1,4 +1,6 @@
-﻿namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
+﻿using System.Diagnostics;
+
+namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public class Hexagon(int biome, int y, int x) {
         #region Variables
         // Const references
@@ -89,22 +91,25 @@
         #endregion
 
         #region Map Generation Functions
-        static void GenerateMap() {
+        static Hexagon[,] GenerateMap(Hexagon[,] map) {
             // Offset to get random map every time
             int xOffset = random.Next(-10000, 10000);
             int yOffset = random.Next(-10000, 10000);
+            float scale = 300f / mapSize;
 
             // Height map generation - whether location should have land
             for (int y = 0; y < mapSize; y++) {
                 for (int x = 0; x < mapSize; x++) {
-                    map[y, x] = new Hexagon(noise.GetNoise(x * 15 + xOffset, y * 15 + yOffset) > 0.05 ? 1 : 0, y, x);
+                    map[y, x] = new Hexagon(noise.GetNoise(x * scale + xOffset, y * scale + yOffset) > 0.05 ? 1 : 0, y, x);
                 }
             }
+
+            return map;
         }
-        static void DetectIslands() {
+        static List<List<Hexagon>> DetectIslands(Hexagon[,] map) {
             //  Variables
             bool[,] searched = new bool[mapSize, mapSize];
-            islands = new List<List<Hexagon>>();
+            List<List<Hexagon>> _islands = new List<List<Hexagon>>();
 
             // Loop through every hexagon
             for (int y = 0; y < mapSize; y++) {
@@ -118,7 +123,7 @@
                     // Find hexagons on this island
                     List<Hexagon> hexes = new List<Hexagon>();
                     void SearchNearby(int y, int x) { // don't ask me how this works, only god remembers
-                        if (0 <= y && y < mapSize && 0 <= x && x < mapSize && !searched[y, x]) {
+                        if (Hexagon.WithinMapBounds(y,x) && !searched[y, x]) {
                             searched[y, x] = true;
                             if (map[y, x].biome == 0)
                                 return;
@@ -130,34 +135,22 @@
                     }
                     SearchNearby(y, x);
 
-                    islands.Add(hexes);
+                    // Add to list if island sufficiently sized
+                    if (hexes.Count > (mapSize / 3))
+                        _islands.Add(hexes);
 
+                    // Completely wipe any traces of the island from existence if too small
+                    else
+                        foreach (Hexagon hex in hexes)
+                            hex.biome = 0;
                 }
             }
+
+            return _islands;
         }
-        static bool ValidateIslands() {
-            int bigIslandCount = 0;
-            List<List<Hexagon>> removeIslands = new List<List<Hexagon>>();
-
-            // Find any island that is too small
-            foreach (List<Hexagon> island in islands) {
-                if (island.Count > (mapSize / 3))
-                    bigIslandCount++;
-                else {
-                    foreach (Hexagon hex in island)
-                        hex.biome = 0;
-                    removeIslands.Add(island);
-                }
-            }
-
-            // Flood islands that are too small
-            foreach (List<Hexagon> island in removeIslands)
-                islands.Remove(island);
-
+        static bool ValidateIslands(List<List<Hexagon>> islands) { //obsolete ig used to be useful in early versions but i dislike removing stuff
             // Check if sufficient island count
-            if (bigIslandCount == 8 && islands.Count == 8)
-                return true;
-            return false;
+            return islands.Count == 8;
         }
         static void SetIslandBiomes() { // Also assigns island variable to hexagons
             int index = 0; // Used for determining which island hex is part of
@@ -209,17 +202,28 @@
             Logging.Log($"Generated {resourceCount}/{mapSize * 3 / 2} resources");
             return resources.ToArray();
         }
-        
-        // Main mapg eneration function
+
+        // Main map generation function - multithreaded!!
         public static void MakeMap(int size) {
             mapSize = size;
-            map = new Hexagon[mapSize, mapSize];
 
-            do {
-                GenerateMap();
-                DetectIslands();
-            } while (!ValidateIslands());
-            
+            Parallel.For(0, Environment.ProcessorCount, (int _, ParallelLoopState state) => {
+                Hexagon[,] _map = new Hexagon[mapSize, mapSize];
+
+                while (!state.IsStopped) {
+                    // Generate things
+                    _map = GenerateMap(_map);
+                    List<List<Hexagon>> _islands = DetectIslands(_map);
+
+                    // Validate & send to main program
+                    if (ValidateIslands(_islands) && !state.IsStopped) {
+                        state.Stop();
+                        map = _map;
+                        islands = _islands;
+                    }
+                }
+            });
+
             SetIslandBiomes();
             GenerateResources();
         }
