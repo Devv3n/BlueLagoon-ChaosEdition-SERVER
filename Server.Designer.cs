@@ -121,6 +121,7 @@
             // 
             // tableLayoutPanel3
             // 
+            tableLayoutPanel3.AutoScroll = true;
             tableLayoutPanel3.ColumnCount = 1;
             tableLayoutPanel3.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableLayoutPanel3.Dock = DockStyle.Fill;
@@ -203,6 +204,7 @@
             MinimumSize = new Size(640, 360);
             Name = "Server";
             Text = "Blue Lagoon - Chaos Edition (SERVER)";
+            Load += Server_Load;
             Resize += Form_Resize;
             tableLayoutPanel1.ResumeLayout(false);
             tableLayoutPanel4.ResumeLayout(false);

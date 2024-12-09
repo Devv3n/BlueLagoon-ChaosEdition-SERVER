@@ -51,12 +51,31 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         #endregion
 
         #region Scaling UI
-        private void Form_Resize(object sender, EventArgs e) {
-            float scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
+        static float scale;
+        private void Server_Load(object sender, EventArgs e) {
+            scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
+        }
 
-            ServerButton.Font = new Font(ServerButton.Font.FontFamily, 18 * scale);
-            ServerPortBox.Font = new Font(ServerPortBox.Font.FontFamily, 23f * scale);
+        void ScaleUI(Control control, float size) {
+            control.Font = new Font(control.Font.FontFamily, size * scale);
+        }
+        private void Form_Resize(object sender, EventArgs e) {
+            // Calculate scale
+            scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
+
+            // Scale fonts
+            ScaleUI(ServerButton, 18f);
+            ScaleUI(ServerPortBox, 23f);
+            ScaleUI(MapSizeLabel, 20f);
+            ScaleUI(MapSizeBox, 23f);
+
+            // Scale player list fonts
+            foreach (Control player in tableLayoutPanel3.Controls)
+                ScaleUI(player, 12f);
+
+            // Scale boxes
             ServerPortBox.Top = (ServerPortBoxBackground.Height - ServerPortBox.Height) / 2;
+            MapSizeBox.Top = (MapSizeBoxBackground.Height - MapSizeBox.Height) / 2;
         }
         #endregion
 
@@ -118,33 +137,36 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         #endregion
 
         #region Player List Handling
+        // Player joining
         public void AddPlayer(Client client) {
             // Setup label
             Label lbl = new Label();
             lbl.Text = client.username;
+            ScaleUI(lbl, 12f);
             lbl.Tag = client;
 
             // Interactive properties setup
             lbl.MouseEnter += PlayerText_MouseEnter;
             lbl.MouseLeave += PlayerText_MouseLeave;
             lbl.Click += PlayerText_Click;
-            
+
             // Display label
             tableLayoutPanel3.Controls.Add(lbl);
-         }
+        }
 
+        // Kick player
         private void PlayerText_Click(object? sender, EventArgs e) {
             if (sender is Label lbl && lbl.Tag is Client client)
                 client.CloseClient();
         }
 
+        // Highlighting player to kick
         private void PlayerText_MouseEnter(object? sender, EventArgs e) {
             if (sender is Label lbl) {
                 lbl.ForeColor = Color.Red;
                 lbl.Font = new Font(lbl.Font, FontStyle.Strikeout);
             }
         }
-
         private void PlayerText_MouseLeave(object? sender, EventArgs e) {
             if (sender is Label lbl) {
                 lbl.ForeColor = Color.Black;
@@ -171,10 +193,15 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         string previousMapSizeText = "";
         private void MapSizeBox_TextChanged(object sender, EventArgs e) {
-            if (!int.TryParse(MapSizeBox.Text, out _))
+            if (!int.TryParse(MapSizeBox.Text, out int size))
                 MapSizeBox.Text = previousMapSizeText;
-            else
+            else {
                 previousMapSizeText = MapSizeBox.Text;
+            
+                // Large map warning (bricks clients' computers lmao)
+                if (size > 50)
+                    MessageBox.Show("A map larger than 50x50 comes with great risks, proceed with extreme caution!", "Map Size Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
 
             SaveConfig();
         }
