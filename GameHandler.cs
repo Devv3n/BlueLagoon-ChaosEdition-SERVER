@@ -292,7 +292,7 @@
                 }
 
                 // Village placement
-                else if (Program.gameStatus == 2 && type == 1 && hex.settler == client && !hex.village && client.villageCount > 0) {
+                else if (Program.gameStatus == 2 && type == 1 && hex.biome != 0 && hex.settler == client && !hex.village && client.villageCount > 0) {
                     // Take village from client and place
                     client.villageCount--;
                     hex.village = true;
