@@ -3,33 +3,14 @@ using System.Net;
 using System.Text;
 
 namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
-    public class Client {
-        #region Variables
-        // Const reference
-        public static int defaultSettlerCount;
-
-        // Client Configuration
-        public bool alive = true;
+    public class Client : Player {
+        #region Client Specific Variables
         public TcpClient client;
         public NetworkStream stream;
-        public string username;
-        public Color color;
-
-        // Gameplay Variables
-        public int[] resourceCount = new int[6];
-        public int settlerCount = defaultSettlerCount;
-        public int villageCount = 3;
-        public bool villagePlaced = false;
-
-        // temp variables for end score calculating
-        public int _score = 0;
-        public int _islandSettlerCount = 0;
-        public bool[] _uniqueIslands = new bool[8];
-        public int _linkedIslands = 0;
         #endregion
 
         #region Client Life Handling
-        public Client(TcpClient client) {
+        public Client(TcpClient client) : base() {
             // Essential client variables
             this.client = client;
             stream = client.GetStream();
@@ -39,16 +20,12 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             stream.Read(buffer, 0, buffer.Length);
             username = Encoding.Unicode.GetString(buffer);
 
-            // Color variable
-            Random rng = new Random();
-            color = Color.FromArgb(255, rng.Next(256), rng.Next(256), rng.Next(256));
-
             // Start handling client
             Task.Run(HandleData);
-            Logging.Log($"New client \"{username}\"");
+            Logging.Log($"New client: {username}");
         }
 
-        public bool IsAlive() {
+        public override bool IsAlive() {
             if (alive) {
                 // Attempts to send a length of 0 byte array and if no errors then client probablyyy still connected
                 try {
@@ -58,7 +35,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         client.Client.Send(new byte[1], 0, 0);
                     }
                     catch {
-                        CloseClient();
+                        Shutdown();
                         return false;
                     }
                     finally {
@@ -66,7 +43,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                     }
                 }
                 catch {
-                    CloseClient();
+                    Shutdown();
                     return false;
                 }
 
@@ -76,58 +53,54 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 return false;
         }
 
-        public void CloseClient() {
+        public override void Shutdown() {
             if (alive) {
                 // Shutdown Client
                 alive = false;
                 stream?.Close();
                 client?.Close();
-                NetworkHandler.RemoveClient(this);
+                NetworkHandler.RemovePlayer(this);
 
-                // Choose next player if mid-game and their turn
-                if (Program.gameStatus != 1 && GameHandler.turn == this)
-                    GameHandler.ChooseNextPlayer();
-
-                Logging.Log($"Client \'{username}\' left");
+                Logging.Log($"Client left: {username}");
             }
         }
         #endregion
 
         #region Data Handling Functions
-        public void SendData(NetworkType type, byte[] data) {
+        public override void SendData(NetworkType type, byte[] data) {
             if (alive) {
                 try {
                     stream.WriteByte((byte)type);
                     stream.Write(data);
                 }
                 catch {
-                    CloseClient();
+                    Shutdown();
                 }
             }
         }
-        bool ReadBuffer(byte[] buffer) {
+        public bool ReadBuffer(byte[] buffer) {
             try {
                 stream.Read(buffer, 0, buffer.Length);
                 return true;
             }
             catch {
-                CloseClient();
+                Shutdown();
                 return false;
             }
         }
-        int ReadByte() {
+        public int ReadByte() {
             try {
                 return stream.ReadByte();
             }
             catch {
-                CloseClient();
+                Shutdown();
                 return -1;
             }
         }
         #endregion
 
         #region Gameplay Functions
-        async void HandleData() {
+        public async void HandleData() {
             while (alive) {
                 int dataType = ReadByte();
                 switch (dataType) {
@@ -160,29 +133,22 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
 
         // Sends display update of settlers/vilalges count
-        public void SendCounterUpdate(int type) { // 0-settler 1-village 2-both
+        public override void SendCounterUpdate(int type) { // 0-settler 1-village 2-both
             if (type == 0 || type == 2)
                 SendData(NetworkType.CounterUpdate, [0, (byte)(settlerCount / 256), (byte)(settlerCount % 256)]);
             if (type == 1 || type == 2)
                 SendData(NetworkType.CounterUpdate, [1, (byte)(villageCount / 256), (byte)(villageCount % 256)]);
         }
         // Send call to increment a statistic
-        public void SendStatistic(StatisticsType statisticType) {
+        public override void SendStatistic(StatisticsType statisticType) {
             SendData(NetworkType.IncrementStatistic, [(byte)statisticType]);
-        }
-
-        // Resets gameplay variables making them ready for next round
-        public void Reset() {
-            resourceCount = new int[6];
-            settlerCount = defaultSettlerCount;
-            villageCount = 3;
         }
         #endregion
     }
 
     public static class NetworkHandler {
         #region Server Variables
-        public static List<Client> clients = new List<Client>();
+        public static List<Player> players = new List<Player>();
         static List<Client> waitingClients = new List<Client>();
         static TcpListener server;
         #endregion
@@ -198,14 +164,14 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 Client client = new Client(await server.AcceptTcpClientAsync());
 
                 // Game full (256 players) - kick client
-                if (clients.Count + waitingClients.Count >= 256) {
-                    client.CloseClient();
+                if (players.Count + waitingClients.Count >= 256) {
+                    client.Shutdown();
                     continue;
                 }
                 
                 // Add client depending whether currently a game is being played
                 if (Program.gameStatus == 1)
-                    AddClient(client);
+                    AddPlayer(client);
                 else
                     waitingClients.Add(client);
 
@@ -213,49 +179,58 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         #endregion
 
-        #region Client Joining/Leaving Handling
-        public static void RemoveClient(Client client) {
-            client.CloseClient();
+        #region Player Joining/Leaving Handling
+        public static void RemovePlayer(Player player) {
+            player.Shutdown();
 
-            if (waitingClients.Contains(client))
+            // Remove waiting player from join queue
+            if (player is Client client && waitingClients.Contains(client))
                 waitingClients.Remove(client);
 
-            else if (clients.Contains(client)) {
-                int index = clients.IndexOf(client);
-                SendAllClients(NetworkType.PlayerLeave, [(byte)index]);
+            // Remove player from game
+            else if (players.Contains(player)) {
+                int index = players.IndexOf(player);
+                SendAllPlayers(NetworkType.PlayerLeave, [(byte)index]);
                 Program.form.Invoke(Program.form.tableLayoutPanel3.GetControlFromPosition(0, index).Dispose);
-                clients.Remove(client);
+                players.Remove(player);
             }
+
+            // Choose next player if mid-game && traitor's turn
+            if (Program.gameStatus != 1 && GameHandler.turn == player)
+                GameHandler.ChooseNextPlayer();
         }
-        static void AddClient(Client client) {
-            clients.Add(client);
+        static void AddPlayer(Player player) {
+            players.Add(player);
 
-            // Add to everyones' player lists
-            foreach (Client c in clients) {
-                if (c != client) {
-                    client.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(c.username));
+            foreach (Player plr in players) {
+                // Add everyone to new player's list of players
+                if (plr != player) {
+                    player.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(plr.username));
                 }
-                c.SendData(NetworkType.PlayerTurn, Encoding.Unicode.GetBytes(client.username));
+
+                // Add new player to everyones' player list
+                plr.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(player.username));
             }
 
-            client.SendStatistic(StatisticsType.ServersJoined);
+            player.SendStatistic(StatisticsType.ServersJoined);
 
             // Add to server's player list
-            Program.form.Invoke(Program.form.AddPlayer, client);
+            Program.form.Invoke(Program.form.AddPlayer, player);
         }
 
         public static void AddWaitingClients() {
             foreach (Client client in waitingClients) {
-                AddClient(client);
+                AddPlayer(client);
             }
+
             waitingClients.Clear();
         }
         #endregion
 
         #region Sending Data Functions
-        public static void SendAllClients(NetworkType type, byte[] data) {
-            foreach (Client client in new List<Client>(clients))
-                client.SendData(type, data);
+        public static void SendAllPlayers(NetworkType type, byte[] data) {
+            foreach (Player player in new List<Player>(players))
+                player.SendData(type, data);
         }
 
         public static void SendMap() {
@@ -271,8 +246,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
 
             // Send map
-            foreach (Client client in clients)
-                client.SendData(NetworkType.SendMap, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
+            SendAllPlayers(NetworkType.SendMap, (new byte[1] { (byte)GameHandler.mapSize }).Concat(buffer).ToArray());
 
             // Send hex resources (if any) of each hex
             foreach (Hexagon hex in resourceHexes)
@@ -281,44 +255,43 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public static void SendHexUpdate(Hexagon hex, int type) {
             if (hex != null) {
                 if (type == 0 || type == 1) // settler || village
-                    SendAllClients(NetworkType.HexUpate, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
+                    SendAllPlayers(NetworkType.HexUpate, [(byte)type, (byte)hex.y, (byte)hex.x, hex.settler.color.R, hex.settler.color.G, hex.settler.color.B]);
                 else // any value !(settler || village)
-                    SendAllClients(NetworkType.HexUpate, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
+                    SendAllPlayers(NetworkType.HexUpate, [(byte)(hex.resource + 2), (byte)hex.y, (byte)hex.x]);
             }
         }
         
         public static void SendScores(bool gameEnd) {
             GameHandler.CalculatePlayerScores();
             
-            List<Client> largestScores = new List<Client>([clients[0]]);
-            byte[] byteScores = new byte[clients.Count * 2];
+            List<Player> largestScores = new List<Player>([players[0]]);
+            byte[] byteScores = new byte[players.Count * 2];
 
             int i = 0;
-            foreach (Client client in clients) {
-                int score = client._score;
+            foreach (Player player in players) {
+                int score = player._score;
                 
                 // Byte[] for sending scores over network
-                byteScores[i++] = (byte)(client._score / 256);
-                byteScores[i++] = (byte)(client._score % 256);
+                byteScores[i++] = (byte)(player._score / 256);
+                byteScores[i++] = (byte)(player._score % 256);
 
                 // Find largest score
                 bool isEqualOrMore = score >= largestScores[0]._score;
                 if (score > largestScores[0]._score)
                     largestScores.Clear();
                 if (isEqualOrMore)
-                    largestScores.Add(client);
+                    largestScores.Add(player);
             }
  
             // Send scores
-            SendAllClients(gameEnd ? NetworkType.EndGame : NetworkType.ClearMap, byteScores);
-
-
+            SendAllPlayers(gameEnd ? NetworkType.EndGame : NetworkType.ClearMap, byteScores);
+            
             // Statistics win/lose sending
-            foreach (Client client in clients) {
-                if (largestScores.Contains(client))
-                    client.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesWon : StatisticsType.SettlementPhasesWon);
+            foreach (Player player in players) {
+                if (largestScores.Contains(player))
+                    player.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesWon : StatisticsType.SettlementPhasesWon);
                 else
-                    client.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesLost : StatisticsType.SettlementPhasesLost);
+                    player.SendStatistic(Program.gameStatus == 2 ? StatisticsType.ExplorationPhasesLost : StatisticsType.SettlementPhasesLost);
             }
         }
         #endregion

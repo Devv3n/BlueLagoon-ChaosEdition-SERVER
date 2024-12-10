@@ -15,7 +15,7 @@
         public int island;
 
         // Gameplay (settler) variables
-        public Client? settler;
+        public Player? settler;
         public bool village = false;
         #endregion
 
@@ -61,7 +61,7 @@
 
             return false;
         }
-        public bool FindNearbySettler(Client settler) {
+        public bool FindNearbySettler(Player settler) {
             foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1)
                 if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].settler == settler)
                     return true;
@@ -83,7 +83,7 @@
         static List<List<Hexagon>> islands;
 
         // Game Configuration
-        public static Client? turn;
+        public static Player? turn;
         static int? resourceCount;
         static int? resourceTypes;
         #endregion
@@ -234,26 +234,35 @@
                 NextRound();
 
             else {
-                int index = NetworkHandler.clients.IndexOf(turn);
+                int index = NetworkHandler.players.IndexOf(turn);
                 int loops = 0;
 
-                // Find next alive client
+                // Find next alive player
                 while (loops <= 1) {
-                    if (NetworkHandler.clients.Count == 0) {
+                    if (NetworkHandler.players.Count == 0) {
                         loops = 2;
                         break;
                     }
-                    index = ++index % NetworkHandler.clients.Count;
+                    index = ++index % NetworkHandler.players.Count;
                     
                     // Loop count calculator
                     if (index == 0)
                         loops++;
 
                     // Next player chooser
-                    Client next = NetworkHandler.clients[index];
+                    Player next = NetworkHandler.players[index];
                     if (next.IsAlive() && next != turn && (Program.gameStatus == 2 || (Program.gameStatus == 3 && next.villagePlaced))) {
                         turn = next;
-                        NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [(byte)index]);
+                        NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [(byte)index]);
+
+                        // 1% chance of natural disaster each turn
+                        if (random.Next(100) == 99)
+                            NaturalDisater();
+
+                        // Makes bots actually do something
+                        if (turn is Bot bot)
+                            Task.Run(bot.MakeMove);
+
                         break;
                     }
                 }
@@ -263,60 +272,70 @@
                     Program.form.FinishGame(false);
             }
         }
-        public static void PlaceSettler(Client client, int type, int y, int x) {
-            // Check if client's turn and validate hexagon position
-            if (turn == client && Hexagon.WithinMapBounds(y, x)) {
+        
+        public static void NaturalDisater() {
+            // todo
+        }
+        
+        public static bool PlaceSettler(Player player, int type, int y, int x) {
+            // Check if player's turn and validate hexagon position
+            if (turn == player && Hexagon.WithinMapBounds(y, x)) {
                 Hexagon hex = map[y, x];
 
                 // Settler placement
                 int settlerUsage = hex.settler == null ? 1 : 3;
-                if (type == 0 && hex.settler != client && !hex.village && client.settlerCount >= settlerUsage) {
-                    if ((Program.gameStatus == 2 && hex.biome == 0) || hex.FindNearbySettler(client)) {
+                if (type == 0 && hex.settler != player && !hex.village && player.settlerCount >= settlerUsage) {
+                    if ((Program.gameStatus == 2 && hex.biome == 0) || hex.FindNearbySettler(player)) {
                         // Take 1/3 settler(s) from client and place
-                        client.settlerCount -= settlerUsage;
-                        hex.settler = client;
+                        player.settlerCount -= settlerUsage;
+                        hex.settler = player;
 
                         // Give client resource (if any) at hex
                         if (hex.resource != -1) {
-                            client.resourceCount[hex.resource]++;
+                            player.resourceCount[hex.resource]++;
                             hex.resource = -1;
                         }
 
                         // Send map/statistics update networking
-                        client.SendStatistic(StatisticsType.SettlersPlaced);
-                        client.SendCounterUpdate(0);
+                        player.SendStatistic(StatisticsType.SettlersPlaced);
+                        player.SendCounterUpdate(0);
                         NetworkHandler.SendHexUpdate(hex, 0);
 
                         ChooseNextPlayer();
+                        return true;
                     }
                 }
 
                 // Village placement
-                else if (Program.gameStatus == 2 && type == 1 && hex.biome != 0 && hex.settler == client && !hex.village && client.villageCount > 0) {
+                else if (Program.gameStatus == 2 && type == 1 && hex.biome != 0 && hex.settler == player && !hex.village && player.villageCount > 0) {
                     // Take village from client and place
-                    client.villageCount--;
+                    player.villageCount--;
                     hex.village = true;
 
                     // Send map/statistics update networking
-                    client.SendStatistic(StatisticsType.VillagesPlaced);
-                    client.SendCounterUpdate(1);
+                    player.SendStatistic(StatisticsType.VillagesPlaced);
+                    player.SendCounterUpdate(1);
                     NetworkHandler.SendHexUpdate(hex, 1);
 
                     ChooseNextPlayer();
+                    return true;
                 }
             }
+
+            // If no valid placement then return false
+            return false;
         }
         #endregion
 
         #region End Functions
-        static async void NextRound() {
+        static void NextRound() {
             if (Program.gameStatus == 2) {
                 NetworkHandler.SendScores(false);
 
                 // Reset to default variables
                 ResetAllPlayers(false);
-                turn = NetworkHandler.clients[0];
-                NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [0]);
+                turn = NetworkHandler.players[0];
+                NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [0]);
 
                 // Find villages & clear map where no villages
                 List<Hexagon> villages = new List<Hexagon>();
@@ -334,18 +353,18 @@
                     NetworkHandler.SendHexUpdate(hex, -1);
 
                 // Send village locations
-                List<Client> villageless = new List<Client>(NetworkHandler.clients);
+                List<Player> villageless = new List<Player>(NetworkHandler.players);
                 foreach (Hexagon hex in villages) {
                     NetworkHandler.SendHexUpdate(hex, hex.village ? 1 : 0);
                     villageless.Remove(hex.settler);
                 }
 
                 // Statistic for people with no villages during settlement phase
-                foreach (Client client in villageless)
-                    client.SendStatistic(StatisticsType.SettlementPhasesUnplayable);
+                foreach (Player player in villageless)
+                    player.SendStatistic(StatisticsType.SettlementPhasesUnplayable);
 
                 // Leaderboard delay
-                await Task.Delay(5000);
+                Thread.Sleep(5000);
                 Program.gameStatus = 3;
             }
             else if (Program.gameStatus == 3)
@@ -357,48 +376,44 @@
                 return true;
 
             // A player has ran out of settlers
-            foreach (Client client in NetworkHandler.clients) {
-                if (client.settlerCount == 0)
+            foreach (Player player in NetworkHandler.players) {
+                if (player.settlerCount == 0)
                     return true;
             }
 
             return false;
         }
         public static void ResetAllPlayers(bool fullReset) {
-            foreach (Client client in NetworkHandler.clients) {
-                client.Reset();
-
-                // End of game reset
-                if (fullReset)
-                    client.villagePlaced = false;
+            foreach (Player player in NetworkHandler.players) {
+                player.Reset(fullReset);
             }
         }
 
         public static void CalculatePlayerScores() {
-            // Reset clients' temp score variables + calculate score from resources
-            foreach (Client client in NetworkHandler.clients) {
+            // Reset players' temp score variables + calculate score from resources
+            foreach (Player player in NetworkHandler.players) {
                 // Reset values
-                client._score = 0;
-                client._islandSettlerCount = 0;
-                client._uniqueIslands = new bool[8];
-                client._linkedIslands = 0;
+                player._score = 0;
+                player._islandSettlerCount = 0;
+                player._uniqueIslands = new bool[8];
+                player._linkedIslands = 0;
 
                 // Resource score
                 int uniqueResources = 0;
-                foreach (int count in client.resourceCount.Skip(1)) {
+                foreach (int count in player.resourceCount.Skip(1)) {
                     if (count > 0)
                         uniqueResources++;
 
                     if (count >= 2)
-                        client._score += 60 * (int)Math.Pow(2, count - 1) / mapSize;
+                        player._score += 60 * (int)Math.Pow(2, count - 1) / mapSize;
                 }
 
                 // Statuette score
-                client._score += 65 / mapSize * client.resourceCount[0];
+                player._score += 65 / mapSize * player.resourceCount[0];
 
                 // Score if player has all available resource types
                 if (uniqueResources == resourceTypes)
-                    client._score += 10;
+                    player._score += 10;
             }
 
             // Island domination calculation
@@ -413,9 +428,9 @@
                 }
 
                 // Find person with most settlers on the island
-                Client dominant = NetworkHandler.clients[0];
+                Player dominant = NetworkHandler.players[0];
                 bool draw = false;
-                foreach (Client client in NetworkHandler.clients) {
+                foreach (Player client in NetworkHandler.players) {
                     dominant = client._islandSettlerCount > dominant._islandSettlerCount ? client : dominant;
                     draw = client._islandSettlerCount == dominant._islandSettlerCount;
                 }
@@ -425,25 +440,25 @@
                     dominant._score += island.Count * 20 / mapSize;
 
                 // Reset settler count on island for each player
-                foreach (Client client in NetworkHandler.clients)
-                    client._islandSettlerCount = 0;
+                foreach (Player player in NetworkHandler.players)
+                    player._islandSettlerCount = 0;
 
                 islandIndex++;
             }
 
             // Unique islands settled on calculation
-            foreach (Client client in NetworkHandler.clients) {
+            foreach (Player player in NetworkHandler.players) {
                 // Count amount of islands client has been on
                 int uniqueIslands = 0;
-                foreach (bool island in client._uniqueIslands)
+                foreach (bool island in player._uniqueIslands)
                     if (island)
                         uniqueIslands++;
 
                 // Add score if sufficient unique islands
                 if (uniqueIslands == 8)
-                    client._score += 20;
+                    player._score += 20;
                 else if (uniqueIslands == 7)
-                    client._score += 10;
+                    player._score += 10;
             }
 
             // Islands linked calculation
@@ -455,11 +470,11 @@
                         continue;
 
                     // Find a chain of hexes
-                    Client? searchSettler = map[y, x].settler;
+                    Player? searchSettler = map[y, x].settler;
                     void SearchNearby(int y, int x) {
                         if (Hexagon.WithinMapBounds(y, x)) {
                             Hexagon hex = map[y, x];
-                            Client? settler = hex.settler;
+                            Player? settler = hex.settler;
 
                             // No settler at hex
                             if (settler == null)
@@ -496,9 +511,9 @@
                         searched[y, x] = true;
                 }
             }
-            foreach (Client client in NetworkHandler.clients) { // Scoring
-                if (client._linkedIslands >= 2)
-                    client._score += client._linkedIslands * 5;
+            foreach (Player player in NetworkHandler.players) { // Scoring
+                if (player._linkedIslands >= 2)
+                    player._score += player._linkedIslands * 5;
             }
         }
         #endregion

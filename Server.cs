@@ -30,13 +30,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
             // Set up game
             GameHandler.MakeMap(mapSize);
-            Client.defaultSettlerCount = 5 * mapSize / NetworkHandler.clients.Count;
+            Player.defaultSettlerCount = 5 * mapSize / NetworkHandler.players.Count;
             GameHandler.ResetAllPlayers(true);
-            GameHandler.turn = NetworkHandler.clients[0];
+            GameHandler.turn = NetworkHandler.players[0];
 
             // Send data
-            NetworkHandler.SendAllClients(NetworkType.PlayerTurn, [0]);
-            foreach (Client client in NetworkHandler.clients) {
+            NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [0]);
+            foreach (Player client in NetworkHandler.players) {
                 client.SendCounterUpdate(2);
                 client.SendStatistic(StatisticsType.GamesPlayed);
             }
@@ -46,7 +46,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             if (sendScores)
                 NetworkHandler.SendScores(true);
             else
-                NetworkHandler.SendAllClients(NetworkType.EndGame, new byte[NetworkHandler.clients.Count * 2]);
+                NetworkHandler.SendAllPlayers(NetworkType.EndGame, new byte[NetworkHandler.players.Count * 2]);
         
             GameHandler.ResetAllPlayers(true);
 
@@ -122,7 +122,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 // Start game
                 case 1: {
                         // Check if sufficient player count (at least 2)
-                        if (NetworkHandler.clients.Count >= 1) {
+                        
+                        if (NetworkHandler.players.Count >= 1) {
                             Program.gameStatus = 2;
                             ServerButton.Text = "...";
                             MapSizeBox.Enabled = false;
@@ -134,7 +135,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                         // Error if less than 2 players
                         else {
                             MessageBox.Show("Not enough players to start the game!", "erawrrrr", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            Logging.LogException($"Lack of players ({2 - NetworkHandler.clients.Count} more needed)");
+                            Logging.LogException($"Lack of players ({2 - NetworkHandler.players.Count} more needed)");
                         }
 
                         break;
@@ -145,7 +146,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         #region Player List Handling
         // Player joining
-        public void AddPlayer(Client client) {
+        public void AddPlayer(Player client) {
             // Setup label
             Label lbl = new Label();
             lbl.Text = client.username;
@@ -163,8 +164,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
         // Kick player
         private void PlayerText_Click(object? sender, EventArgs e) {
-            if (sender is Label lbl && lbl.Tag is Client client)
-                client.CloseClient();
+            if (sender is Label lbl && lbl.Tag is Player client)
+                client.Shutdown();
         }
 
         // Highlighting player to kick
