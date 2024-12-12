@@ -19,7 +19,7 @@
         public bool village = false;
         #endregion
 
-        #region Hex Random Resource Generation
+        #region Gameplay Functions
         // Generate a resource until all conditions met
         public void SetRandomResource() {
             int[] resourceTypes = biomeResourceTypes[biome - 1];
@@ -43,6 +43,17 @@
                 break;
             }
         }
+
+        // Remove any village/settler at hexagon used for natural disasters
+        public void Clear() {
+            if (settler != null && village) {
+                settler.villagesPlaced--;
+                village = false;
+            }
+            settler = null;
+
+            NetworkHandler.SendAllPlayers(NetworkType.HexClear, [(byte)y, (byte)x]);
+        }
         #endregion
 
         #region Search Neighbouring Hexes Functions
@@ -57,6 +68,13 @@
         public bool FindNearbyWater() {
             foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1)
                 if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].biome == 0)
+                    return true;
+
+            return false;
+        }
+        public bool FindNearbyLand() {
+            foreach (int[] offset in y % 2 == 0 ? hexOffsets0 : hexOffsets1)
+                if (WithinMapBounds(y + offset[0], x + offset[1]) && GameHandler.map[y + offset[0], x + offset[1]].biome != 0)
                     return true;
 
             return false;
@@ -251,12 +269,12 @@
 
                     // Next player chooser
                     Player next = NetworkHandler.players[index];
-                    if (next.IsAlive() && next != turn && (Program.gameStatus == 2 || (Program.gameStatus == 3 && next.villagePlaced))) {
+                    if (next.IsAlive() && next != turn && (Program.gameStatus == 2 || (Program.gameStatus == 3 && next.villagesPlaced != 0))) {
                         turn = next;
                         NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [(byte)index]);
 
-                        // 1% chance of natural disaster each turn
-                        if (random.Next(100) == 99)
+                        // 1/playerCount% chance of natural disaster each turn (1% each round)
+                        if (random.Next(100 * NetworkHandler.players.Count) == 48)
                             NaturalDisater();
 
                         // Makes bots actually do something
@@ -272,11 +290,43 @@
                     Program.form.FinishGame(false);
             }
         }
-        
+
         public static void NaturalDisater() {
-            // todo
+            int type = random.Next(30);
+            
+            // 3.3% Revolt (a village is burned)
+            if (type == 29 && Program.gameStatus != 3) {
+                // Obtain a list of villages
+                List<Hexagon> villageList = new List<Hexagon>();
+                foreach (Hexagon hex in map)
+                    if (hex.village)
+                        villageList.Add(hex);
+
+                // Destroy a random village & alert people of this "natural disaster"
+                if (villageList.Count > 0) {
+                    NetworkHandler.SendDisaster(Disaster.Revolt);
+                    villageList[random.Next(villageList.Count)].Clear();
+                    return; // prevent any other conditions being checked
+                } 
+            }
+
+            // 30% Mysterious deadly force on an island clearing settlers
+            if (type > 20) {
+                NetworkHandler.SendDisaster(Disaster.MysteriousDeadlyForce);
+                foreach (Hexagon hex in map)
+                    if (hex.settler != null && !hex.village && random.Next(mapSize / 2) == 0)
+                            hex.Clear();
+            }
+
+            // 66.7% Map wide flood/tornado clearing settlers
+            else {
+                NetworkHandler.SendDisaster(random.Next(2) == 1 ? Disaster.Flood : Disaster.Tornado);
+                foreach (Hexagon hex in map)
+                    if (hex.settler != null && !hex.village && random.Next(mapSize * 5) == 0)
+                        hex.Clear();
+            }
         }
-        
+
         public static bool PlaceSettler(Player player, int type, int y, int x) {
             // Check if player's turn and validate hexagon position
             if (turn == player && Hexagon.WithinMapBounds(y, x)) {
@@ -310,6 +360,7 @@
                 else if (Program.gameStatus == 2 && type == 1 && hex.biome != 0 && hex.settler == player && !hex.village && player.villageCount > 0) {
                     // Take village from client and place
                     player.villageCount--;
+                    player.villagesPlaced++;
                     hex.village = true;
 
                     // Send map/statistics update networking
@@ -330,12 +381,16 @@
         #region End Functions
         static void NextRound() {
             if (Program.gameStatus == 2) {
+                Program.gameStatus = 3;
                 NetworkHandler.SendScores(false);
 
                 // Reset to default variables
                 ResetAllPlayers(false);
                 turn = NetworkHandler.players[0];
-                NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [0]);
+                if (turn.villageCount == 0)
+                    ChooseNextPlayer();
+                else
+                    NetworkHandler.SendAllPlayers(NetworkType.PlayerTurn, [0]);
 
                 // Find villages & clear map where no villages
                 List<Hexagon> villages = new List<Hexagon>();
@@ -365,7 +420,10 @@
 
                 // Leaderboard delay
                 Thread.Sleep(5000);
-                Program.gameStatus = 3;
+
+                // if it is a silly bot as first player make them do something
+                if (turn is Bot bot)
+                    bot.MakeMove();
             }
             else if (Program.gameStatus == 3)
                 Program.form.FinishGame(true);

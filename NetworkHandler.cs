@@ -149,7 +149,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public static class NetworkHandler {
         #region Server Variables
         public static List<Player> players = new List<Player>();
-        static List<Client> waitingClients = new List<Client>();
+        public static List<Client> waitingClients = new List<Client>();
         static TcpListener server;
         #endregion
 
@@ -191,7 +191,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             else if (players.Contains(player)) {
                 int index = players.IndexOf(player);
                 SendAllPlayers(NetworkType.PlayerLeave, [(byte)index]);
-                Program.form.Invoke(Program.form.tableLayoutPanel3.GetControlFromPosition(0, index).Dispose);
+                Program.form.Invoke(() => Program.form.tableLayoutPanel3.GetControlFromPosition(0, index)?.Dispose());
                 players.Remove(player);
             }
 
@@ -199,17 +199,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             if (Program.gameStatus != 1 && GameHandler.turn == player)
                 GameHandler.ChooseNextPlayer();
         }
-        static void AddPlayer(Player player) {
+        public static void AddPlayer(Player player) {
             players.Add(player);
 
-            foreach (Player plr in players) {
+            foreach (Player plr in players.ToList()) {
                 // Add everyone to new player's list of players
                 if (plr != player) {
-                    player.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(plr.username));
+                    player.SendData(NetworkType.PlayerJoin, Encoding.UTF32.GetBytes(plr.username.PadRight(32)));
                 }
 
                 // Add new player to everyones' player list
-                plr.SendData(NetworkType.PlayerJoin, Encoding.Unicode.GetBytes(player.username));
+                plr.SendData(NetworkType.PlayerJoin, Encoding.UTF32.GetBytes(player.username.PadRight(32)));
             }
 
             player.SendStatistic(StatisticsType.ServersJoined);
@@ -261,6 +261,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             }
         }
         
+        public static void SendDisaster(Disaster disaster) {
+            SendAllPlayers(NetworkType.NaturalDisaster, [(byte)disaster]);
+        }
         public static void SendScores(bool gameEnd) {
             GameHandler.CalculatePlayerScores();
             

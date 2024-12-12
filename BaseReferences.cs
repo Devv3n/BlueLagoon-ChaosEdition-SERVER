@@ -5,7 +5,8 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
     public enum NetworkType : byte {
         SendMap = 210,
         HexUpate = 211,
-        NaturalDisaster = 212,
+        HexClear = 212,
+        NaturalDisaster = 213,
         ClearMap = 218,
         EndGame = 219,
         
@@ -33,6 +34,13 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         SettlementPhasesUnplayable,
     }
 
+    public enum Disaster : byte {
+        Revolt,
+        MysteriousDeadlyForce,
+        Flood,
+        Tornado
+    }
+
     public abstract class Player {
         #region Variables
         // Const reference
@@ -48,7 +56,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         public int[] resourceCount = new int[6];
         public int settlerCount = 0;
         public int villageCount = 0;
-        public bool villagePlaced = false;
+        public int villagesPlaced = 0;
 
         // temp variables for end score calculating
         public int _score = 0;
@@ -77,7 +85,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             villageCount = 3;
 
             if (full)
-                villagePlaced = true;
+                villagesPlaced = 0;
         }
         #endregion
     }

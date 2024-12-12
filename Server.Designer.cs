@@ -25,6 +25,8 @@
         private void InitializeComponent() {
             tableLayoutPanel1 = new TableLayoutPanel();
             tableLayoutPanel4 = new TableLayoutPanel();
+            AddBotButton = new Button();
+            tableLayoutPanel5 = new TableLayoutPanel();
             MapSizeBoxBackground = new Panel();
             MapSizeBox = new TextBox();
             MapSizeLabel = new Label();
@@ -35,6 +37,7 @@
             ServerPortBox = new TextBox();
             tableLayoutPanel1.SuspendLayout();
             tableLayoutPanel4.SuspendLayout();
+            tableLayoutPanel5.SuspendLayout();
             MapSizeBoxBackground.SuspendLayout();
             tableLayoutPanel2.SuspendLayout();
             ServerPortBoxBackground.SuspendLayout();
@@ -61,21 +64,49 @@
             // 
             // tableLayoutPanel4
             // 
-            tableLayoutPanel4.ColumnCount = 2;
-            tableLayoutPanel4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel4.Controls.Add(MapSizeBoxBackground, 1, 1);
-            tableLayoutPanel4.Controls.Add(MapSizeLabel, 0, 1);
+            tableLayoutPanel4.ColumnCount = 1;
+            tableLayoutPanel4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableLayoutPanel4.Controls.Add(AddBotButton, 0, 1);
+            tableLayoutPanel4.Controls.Add(tableLayoutPanel5, 0, 0);
             tableLayoutPanel4.Dock = DockStyle.Fill;
             tableLayoutPanel4.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
             tableLayoutPanel4.Location = new Point(318, 4);
             tableLayoutPanel4.Margin = new Padding(6, 4, 6, 4);
             tableLayoutPanel4.Name = "tableLayoutPanel4";
-            tableLayoutPanel4.RowCount = 2;
-            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 75F));
+            tableLayoutPanel4.RowCount = 3;
             tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutPanel4.Size = new Size(300, 248);
             tableLayoutPanel4.TabIndex = 2;
+            // 
+            // AddBotButton
+            // 
+            AddBotButton.Dock = DockStyle.Fill;
+            AddBotButton.Font = new Font("Segoe UI", 20F);
+            AddBotButton.Location = new Point(6, 66);
+            AddBotButton.Margin = new Padding(6, 4, 6, 4);
+            AddBotButton.Name = "AddBotButton";
+            AddBotButton.Size = new Size(288, 54);
+            AddBotButton.TabIndex = 4;
+            AddBotButton.Text = "Add Bot";
+            AddBotButton.UseVisualStyleBackColor = true;
+            AddBotButton.Click += AddBotButton_Click;
+            // 
+            // tableLayoutPanel5
+            // 
+            tableLayoutPanel5.ColumnCount = 2;
+            tableLayoutPanel5.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutPanel5.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutPanel5.Controls.Add(MapSizeBoxBackground, 0, 0);
+            tableLayoutPanel5.Controls.Add(MapSizeLabel, 0, 0);
+            tableLayoutPanel5.Dock = DockStyle.Fill;
+            tableLayoutPanel5.Location = new Point(3, 3);
+            tableLayoutPanel5.Name = "tableLayoutPanel5";
+            tableLayoutPanel5.RowCount = 1;
+            tableLayoutPanel5.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutPanel5.Size = new Size(294, 56);
+            tableLayoutPanel5.TabIndex = 3;
             // 
             // MapSizeBoxBackground
             // 
@@ -83,11 +114,11 @@
             MapSizeBoxBackground.BorderStyle = BorderStyle.FixedSingle;
             MapSizeBoxBackground.Controls.Add(MapSizeBox);
             MapSizeBoxBackground.Dock = DockStyle.Fill;
-            MapSizeBoxBackground.Location = new Point(154, 192);
+            MapSizeBoxBackground.Location = new Point(151, 6);
             MapSizeBoxBackground.Margin = new Padding(4, 6, 4, 6);
             MapSizeBoxBackground.Name = "MapSizeBoxBackground";
-            MapSizeBoxBackground.Size = new Size(142, 50);
-            MapSizeBoxBackground.TabIndex = 1;
+            MapSizeBoxBackground.Size = new Size(139, 44);
+            MapSizeBoxBackground.TabIndex = 4;
             // 
             // MapSizeBox
             // 
@@ -95,7 +126,7 @@
             MapSizeBox.BackColor = Color.White;
             MapSizeBox.BorderStyle = BorderStyle.None;
             MapSizeBox.Font = new Font("Segoe UI", 23F);
-            MapSizeBox.Location = new Point(0, 4);
+            MapSizeBox.Location = new Point(-1, 1);
             MapSizeBox.Margin = new Padding(0);
             MapSizeBox.MaxLength = 3;
             MapSizeBox.Name = "MapSizeBox";
@@ -105,17 +136,16 @@
             MapSizeBox.Text = "14";
             MapSizeBox.TextAlign = HorizontalAlignment.Center;
             MapSizeBox.WordWrap = false;
-            MapSizeBox.TextChanged += MapSizeBox_TextChanged;
             // 
             // MapSizeLabel
             // 
             MapSizeLabel.Dock = DockStyle.Fill;
             MapSizeLabel.Font = new Font("Segoe UI", 20F);
-            MapSizeLabel.Location = new Point(4, 192);
+            MapSizeLabel.Location = new Point(4, 6);
             MapSizeLabel.Margin = new Padding(4, 6, 4, 6);
             MapSizeLabel.Name = "MapSizeLabel";
-            MapSizeLabel.Size = new Size(142, 50);
-            MapSizeLabel.TabIndex = 2;
+            MapSizeLabel.Size = new Size(139, 44);
+            MapSizeLabel.TabIndex = 3;
             MapSizeLabel.Text = "Map Size";
             MapSizeLabel.TextAlign = ContentAlignment.MiddleCenter;
             // 
@@ -208,6 +238,7 @@
             Resize += Form_Resize;
             tableLayoutPanel1.ResumeLayout(false);
             tableLayoutPanel4.ResumeLayout(false);
+            tableLayoutPanel5.ResumeLayout(false);
             MapSizeBoxBackground.ResumeLayout(false);
             MapSizeBoxBackground.PerformLayout();
             tableLayoutPanel2.ResumeLayout(false);
@@ -225,8 +256,10 @@
         internal Panel ServerPortBoxBackground;
         internal TableLayoutPanel tableLayoutPanel3;
         internal TableLayoutPanel tableLayoutPanel4;
+        private TableLayoutPanel tableLayoutPanel5;
         internal Panel MapSizeBoxBackground;
         internal TextBox MapSizeBox;
         private Label MapSizeLabel;
+        internal Button AddBotButton;
     }
 }

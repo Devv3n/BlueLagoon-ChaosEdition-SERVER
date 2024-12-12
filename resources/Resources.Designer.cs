@@ -61,21 +61,30 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Evil Kanishka &gt;:)
-        ///GyattGPT.
+        ///   Looks up a localized string similar to Evil Kanishka &gt;:(
+        ///Nice Kanishka :)
+        ///GyattGPT
+        ///BadGPT
+        ///Bot
+        ///Bot Bot
+        ///Bot Bot Bot 
+        ///Bot Bot Bot Bot 
+        ///Bot Bot Bot Bot Bot 
+        ///Bot Bot Bot Bot Bot Bot 
+        ///Bot Bot Bot Bot Bot Bot Bot
+        ///Bot Bot Bot Bot Bot Bot Bot secret text owo hi
+        ///Ambatutron
+        ///Droyd
+        ///Neko
+        ///Koneko
+        ///Useless
+        ///Yakutatazu
+        ///skibaidi
+        ///hawk taih.
         /// </summary>
         internal static string BotUsernames {
             get {
                 return ResourceManager.GetString("BotUsernames", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to .
-        /// </summary>
-        internal static string String1 {
-            get {
-                return ResourceManager.GetString("String1", resourceCulture);
             }
         }
     }

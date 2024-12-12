@@ -41,13 +41,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 client.SendStatistic(StatisticsType.GamesPlayed);
             }
             NetworkHandler.SendMap();
+
+            // if it is a silly bot as first player make them do something
+            if (GameHandler.turn is Bot bot)
+                bot.MakeMove();
         }
         public void FinishGame(bool sendScores) {
             if (sendScores)
                 NetworkHandler.SendScores(true);
             else
                 NetworkHandler.SendAllPlayers(NetworkType.EndGame, new byte[NetworkHandler.players.Count * 2]);
-        
+
             GameHandler.ResetAllPlayers(true);
 
             Program.gameStatus = 1;
@@ -66,6 +70,9 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         void ScaleUI(Control control, float size) {
             control.Font = new Font(control.Font.FontFamily, size * scale);
         }
+        void ScaleUIMargin(Control control, int margin) {
+            control.Margin = new Padding((int)(margin * scale));
+        }
         private void Form_Resize(object sender, EventArgs e) {
             // Calculate scale
             scale = Math.Min(this.Size.Width / 640f, this.Size.Height / 360f) * 96f / (this.DeviceDpi * 1.05f);
@@ -75,12 +82,20 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             ScaleUI(ServerPortBox, 23f);
             ScaleUI(MapSizeLabel, 20f);
             ScaleUI(MapSizeBox, 23f);
+            ScaleUI(AddBotButton, 20f);
+
+            // Scale margins
+            ScaleUIMargin(ServerButton, 4);
+            ScaleUIMargin(ServerPortBoxBackground, 4);
+            ScaleUIMargin(MapSizeLabel, 4);
+            ScaleUIMargin(MapSizeBoxBackground, 4);
+            ScaleUIMargin(AddBotButton, 4);
 
             // Scale player list fonts
             foreach (Control player in tableLayoutPanel3.Controls)
                 ScaleUI(player, 12f);
 
-            // Scale boxes
+            // Move text box inputs according to its enclosure
             ServerPortBox.Top = (ServerPortBoxBackground.Height - ServerPortBox.Height) / 2;
             MapSizeBox.Top = (MapSizeBoxBackground.Height - MapSizeBox.Height) / 2;
         }
@@ -122,7 +137,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 // Start game
                 case 1: {
                         // Check if sufficient player count (at least 2)
-                        
+
                         if (NetworkHandler.players.Count >= 1) {
                             Program.gameStatus = 2;
                             ServerButton.Text = "...";
@@ -140,18 +155,34 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
 
                         break;
                     }
+
+                // Check if players are still connected to server
+                default: {
+                        foreach (Player player in NetworkHandler.players)
+                            player.IsAlive();
+                        break;
+                    }
             }
         }
         #endregion
 
-        #region Player List Handling
+        #region Player List/Bot Adding Handling
+        // Add Bot
+        private void AddBotButton_Click(object sender, EventArgs e) {
+            if (Program.gameStatus == 1 && NetworkHandler.players.Count + NetworkHandler.waitingClients.Count < 256) {
+                Bot bot = new Bot();
+                NetworkHandler.AddPlayer(bot); // its actually infuriating that i have the same function name in 2 differnet places
+            }
+        }
+        
         // Player joining
-        public void AddPlayer(Player client) {
+        public void AddPlayer(Player player) {
             // Setup label
             Label lbl = new Label();
-            lbl.Text = client.username;
+            lbl.Text = player.username;
             ScaleUI(lbl, 12f);
-            lbl.Tag = client;
+            lbl.Tag = player;
+            lbl.Dock = DockStyle.Fill;
 
             // Interactive properties setup
             lbl.MouseEnter += PlayerText_MouseEnter;
@@ -205,7 +236,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 MapSizeBox.Text = previousMapSizeText;
             else {
                 previousMapSizeText = MapSizeBox.Text;
-            
+
                 // Large map warning (bricks clients' computers lmao)
                 if (size > 50)
                     MessageBox.Show("A map larger than 50x50 comes with great risks, proceed with extreme caution!", "Map Size Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
