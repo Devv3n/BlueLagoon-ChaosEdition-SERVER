@@ -92,7 +92,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             ScaleUIMargin(AddBotButton, 4);
 
             // Scale player list fonts
-            foreach (Control player in tableLayoutPanel3.Controls)
+            foreach (Control player in PlayerListPanel.Controls)
                 ScaleUI(player, 12f);
 
             // Move text box inputs according to its enclosure
@@ -174,15 +174,17 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                 NetworkHandler.AddPlayer(bot); // its actually infuriating that i have the same function name in 2 differnet places
             }
         }
-        
+
         // Player joining
         public void AddPlayer(Player player) {
             // Setup label
-            Label lbl = new Label();
-            lbl.Text = player.username;
+            Label lbl = new Label() {
+                Text = player.username,
+                Tag = player,
+                Dock = DockStyle.Fill,
+                ForeColor = Color.White,
+            };
             ScaleUI(lbl, 12f);
-            lbl.Tag = player;
-            lbl.Dock = DockStyle.Fill;
 
             // Interactive properties setup
             lbl.MouseEnter += PlayerText_MouseEnter;
@@ -190,7 +192,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             lbl.Click += PlayerText_Click;
 
             // Display label
-            tableLayoutPanel3.Controls.Add(lbl);
+            PlayerListPanel.Controls.Add(lbl);
         }
 
         // Kick player

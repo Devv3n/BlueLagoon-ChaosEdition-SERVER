@@ -381,8 +381,8 @@
         #region End Functions
         static void NextRound() {
             if (Program.gameStatus == 2) {
-                Program.gameStatus = 3;
                 NetworkHandler.SendScores(false);
+                Program.gameStatus = 3;
 
                 // Reset to default variables
                 ResetAllPlayers(false);

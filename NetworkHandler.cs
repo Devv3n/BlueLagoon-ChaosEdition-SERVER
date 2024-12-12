@@ -191,7 +191,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
             else if (players.Contains(player)) {
                 int index = players.IndexOf(player);
                 SendAllPlayers(NetworkType.PlayerLeave, [(byte)index]);
-                Program.form.Invoke(() => Program.form.tableLayoutPanel3.GetControlFromPosition(0, index)?.Dispose());
+                Program.form.Invoke(() => Program.form.PlayerListPanel.GetControlFromPosition(0, index)?.Dispose());
                 players.Remove(player);
             }
 

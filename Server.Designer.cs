@@ -23,74 +23,80 @@
         ///  the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
-            tableLayoutPanel1 = new TableLayoutPanel();
-            tableLayoutPanel4 = new TableLayoutPanel();
+            BackgroundPanel = new TableLayoutPanel();
+            ConfigPanel = new TableLayoutPanel();
             AddBotButton = new Button();
             tableLayoutPanel5 = new TableLayoutPanel();
             MapSizeBoxBackground = new Panel();
             MapSizeBox = new TextBox();
             MapSizeLabel = new Label();
-            tableLayoutPanel3 = new TableLayoutPanel();
-            tableLayoutPanel2 = new TableLayoutPanel();
+            PlayerListPanel = new TableLayoutPanel();
+            ImportantPanel = new TableLayoutPanel();
             ServerButton = new Button();
             ServerPortBoxBackground = new Panel();
             ServerPortBox = new TextBox();
-            tableLayoutPanel1.SuspendLayout();
-            tableLayoutPanel4.SuspendLayout();
+            BackgroundPanel.SuspendLayout();
+            ConfigPanel.SuspendLayout();
             tableLayoutPanel5.SuspendLayout();
             MapSizeBoxBackground.SuspendLayout();
-            tableLayoutPanel2.SuspendLayout();
+            ImportantPanel.SuspendLayout();
             ServerPortBoxBackground.SuspendLayout();
             SuspendLayout();
             // 
-            // tableLayoutPanel1
+            // BackgroundPanel
             // 
-            tableLayoutPanel1.ColumnCount = 2;
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel1.Controls.Add(tableLayoutPanel4, 1, 0);
-            tableLayoutPanel1.Controls.Add(tableLayoutPanel3, 0, 0);
-            tableLayoutPanel1.Controls.Add(tableLayoutPanel2, 1, 1);
-            tableLayoutPanel1.Dock = DockStyle.Fill;
-            tableLayoutPanel1.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
-            tableLayoutPanel1.Location = new Point(0, 0);
-            tableLayoutPanel1.Margin = new Padding(0);
-            tableLayoutPanel1.Name = "tableLayoutPanel1";
-            tableLayoutPanel1.RowCount = 2;
-            tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 80F));
-            tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
-            tableLayoutPanel1.Size = new Size(624, 321);
-            tableLayoutPanel1.TabIndex = 0;
+            BackgroundPanel.BackColor = Color.FromArgb(40, 40, 40);
+            BackgroundPanel.ColumnCount = 2;
+            BackgroundPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            BackgroundPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            BackgroundPanel.Controls.Add(ConfigPanel, 1, 0);
+            BackgroundPanel.Controls.Add(PlayerListPanel, 0, 0);
+            BackgroundPanel.Controls.Add(ImportantPanel, 1, 1);
+            BackgroundPanel.Dock = DockStyle.Fill;
+            BackgroundPanel.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
+            BackgroundPanel.Location = new Point(0, 0);
+            BackgroundPanel.Margin = new Padding(0);
+            BackgroundPanel.Name = "BackgroundPanel";
+            BackgroundPanel.RowCount = 2;
+            BackgroundPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 80F));
+            BackgroundPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+            BackgroundPanel.Size = new Size(624, 321);
+            BackgroundPanel.TabIndex = 0;
             // 
-            // tableLayoutPanel4
+            // ConfigPanel
             // 
-            tableLayoutPanel4.ColumnCount = 1;
-            tableLayoutPanel4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tableLayoutPanel4.Controls.Add(AddBotButton, 0, 1);
-            tableLayoutPanel4.Controls.Add(tableLayoutPanel5, 0, 0);
-            tableLayoutPanel4.Dock = DockStyle.Fill;
-            tableLayoutPanel4.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
-            tableLayoutPanel4.Location = new Point(318, 4);
-            tableLayoutPanel4.Margin = new Padding(6, 4, 6, 4);
-            tableLayoutPanel4.Name = "tableLayoutPanel4";
-            tableLayoutPanel4.RowCount = 3;
-            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-            tableLayoutPanel4.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            tableLayoutPanel4.Size = new Size(300, 248);
-            tableLayoutPanel4.TabIndex = 2;
+            ConfigPanel.ColumnCount = 1;
+            ConfigPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            ConfigPanel.Controls.Add(AddBotButton, 0, 1);
+            ConfigPanel.Controls.Add(tableLayoutPanel5, 0, 0);
+            ConfigPanel.Dock = DockStyle.Fill;
+            ConfigPanel.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
+            ConfigPanel.Location = new Point(318, 4);
+            ConfigPanel.Margin = new Padding(6, 4, 6, 4);
+            ConfigPanel.Name = "ConfigPanel";
+            ConfigPanel.RowCount = 3;
+            ConfigPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            ConfigPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            ConfigPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            ConfigPanel.Size = new Size(300, 248);
+            ConfigPanel.TabIndex = 2;
             // 
             // AddBotButton
             // 
+            AddBotButton.BackColor = Color.FromArgb(30, 30, 30);
             AddBotButton.Dock = DockStyle.Fill;
+            AddBotButton.FlatAppearance.BorderColor = Color.FromArgb(34, 34, 34);
+            AddBotButton.FlatAppearance.BorderSize = 2;
+            AddBotButton.FlatStyle = FlatStyle.Flat;
             AddBotButton.Font = new Font("Segoe UI", 20F);
+            AddBotButton.ForeColor = Color.White;
             AddBotButton.Location = new Point(6, 66);
             AddBotButton.Margin = new Padding(6, 4, 6, 4);
             AddBotButton.Name = "AddBotButton";
             AddBotButton.Size = new Size(288, 54);
             AddBotButton.TabIndex = 4;
             AddBotButton.Text = "Add Bot";
-            AddBotButton.UseVisualStyleBackColor = true;
+            AddBotButton.UseVisualStyleBackColor = false;
             AddBotButton.Click += AddBotButton_Click;
             // 
             // tableLayoutPanel5
@@ -110,10 +116,11 @@
             // 
             // MapSizeBoxBackground
             // 
-            MapSizeBoxBackground.BackColor = Color.White;
+            MapSizeBoxBackground.BackColor = Color.FromArgb(30, 30, 30);
             MapSizeBoxBackground.BorderStyle = BorderStyle.FixedSingle;
             MapSizeBoxBackground.Controls.Add(MapSizeBox);
             MapSizeBoxBackground.Dock = DockStyle.Fill;
+            MapSizeBoxBackground.ForeColor = Color.FromArgb(34, 34, 34);
             MapSizeBoxBackground.Location = new Point(151, 6);
             MapSizeBoxBackground.Margin = new Padding(4, 6, 4, 6);
             MapSizeBoxBackground.Name = "MapSizeBoxBackground";
@@ -123,9 +130,10 @@
             // MapSizeBox
             // 
             MapSizeBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            MapSizeBox.BackColor = Color.White;
+            MapSizeBox.BackColor = Color.FromArgb(30, 30, 30);
             MapSizeBox.BorderStyle = BorderStyle.None;
             MapSizeBox.Font = new Font("Segoe UI", 23F);
+            MapSizeBox.ForeColor = Color.White;
             MapSizeBox.Location = new Point(-1, 1);
             MapSizeBox.Margin = new Padding(0);
             MapSizeBox.MaxLength = 3;
@@ -141,6 +149,7 @@
             // 
             MapSizeLabel.Dock = DockStyle.Fill;
             MapSizeLabel.Font = new Font("Segoe UI", 20F);
+            MapSizeLabel.ForeColor = Color.White;
             MapSizeLabel.Location = new Point(4, 6);
             MapSizeLabel.Margin = new Padding(4, 6, 4, 6);
             MapSizeLabel.Name = "MapSizeLabel";
@@ -149,57 +158,63 @@
             MapSizeLabel.Text = "Map Size";
             MapSizeLabel.TextAlign = ContentAlignment.MiddleCenter;
             // 
-            // tableLayoutPanel3
+            // PlayerListPanel
             // 
-            tableLayoutPanel3.AutoScroll = true;
-            tableLayoutPanel3.ColumnCount = 1;
-            tableLayoutPanel3.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tableLayoutPanel3.Dock = DockStyle.Fill;
-            tableLayoutPanel3.Location = new Point(6, 4);
-            tableLayoutPanel3.Margin = new Padding(6, 4, 6, 4);
-            tableLayoutPanel3.Name = "tableLayoutPanel3";
-            tableLayoutPanel3.RowCount = 1;
-            tableLayoutPanel3.RowStyles.Add(new RowStyle());
-            tableLayoutPanel3.Size = new Size(300, 248);
-            tableLayoutPanel3.TabIndex = 1;
+            PlayerListPanel.AutoScroll = true;
+            PlayerListPanel.ColumnCount = 1;
+            PlayerListPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            PlayerListPanel.Dock = DockStyle.Fill;
+            PlayerListPanel.Location = new Point(6, 4);
+            PlayerListPanel.Margin = new Padding(6, 4, 6, 4);
+            PlayerListPanel.Name = "PlayerListPanel";
+            PlayerListPanel.RowCount = 1;
+            PlayerListPanel.RowStyles.Add(new RowStyle());
+            PlayerListPanel.Size = new Size(300, 248);
+            PlayerListPanel.TabIndex = 1;
             // 
-            // tableLayoutPanel2
+            // ImportantPanel
             // 
-            tableLayoutPanel2.ColumnCount = 2;
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel2.Controls.Add(ServerButton, 1, 0);
-            tableLayoutPanel2.Controls.Add(ServerPortBoxBackground, 0, 0);
-            tableLayoutPanel2.Dock = DockStyle.Fill;
-            tableLayoutPanel2.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
-            tableLayoutPanel2.Location = new Point(318, 260);
-            tableLayoutPanel2.Margin = new Padding(6, 4, 6, 4);
-            tableLayoutPanel2.Name = "tableLayoutPanel2";
-            tableLayoutPanel2.RowCount = 1;
-            tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 49F));
-            tableLayoutPanel2.Size = new Size(300, 57);
-            tableLayoutPanel2.TabIndex = 0;
+            ImportantPanel.ColumnCount = 2;
+            ImportantPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            ImportantPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            ImportantPanel.Controls.Add(ServerButton, 1, 0);
+            ImportantPanel.Controls.Add(ServerPortBoxBackground, 0, 0);
+            ImportantPanel.Dock = DockStyle.Fill;
+            ImportantPanel.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
+            ImportantPanel.Location = new Point(318, 260);
+            ImportantPanel.Margin = new Padding(6, 4, 6, 4);
+            ImportantPanel.Name = "ImportantPanel";
+            ImportantPanel.RowCount = 1;
+            ImportantPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            ImportantPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 49F));
+            ImportantPanel.Size = new Size(300, 57);
+            ImportantPanel.TabIndex = 0;
             // 
             // ServerButton
             // 
+            ServerButton.BackColor = Color.FromArgb(30, 30, 30);
             ServerButton.Dock = DockStyle.Fill;
+            ServerButton.FlatAppearance.BorderColor = Color.FromArgb(34, 34, 34);
+            ServerButton.FlatAppearance.BorderSize = 2;
+            ServerButton.FlatStyle = FlatStyle.Flat;
             ServerButton.Font = new Font("Segoe UI", 18F);
+            ServerButton.ForeColor = Color.White;
             ServerButton.Location = new Point(156, 4);
             ServerButton.Margin = new Padding(6, 4, 6, 4);
             ServerButton.Name = "ServerButton";
             ServerButton.Size = new Size(138, 49);
             ServerButton.TabIndex = 0;
             ServerButton.Text = "Run Server";
-            ServerButton.UseVisualStyleBackColor = true;
+            ServerButton.UseVisualStyleBackColor = false;
             ServerButton.Click += ServerButton_Click;
             // 
             // ServerPortBoxBackground
             // 
-            ServerPortBoxBackground.BackColor = Color.White;
+            ServerPortBoxBackground.BackColor = Color.FromArgb(30, 30, 30);
             ServerPortBoxBackground.BorderStyle = BorderStyle.FixedSingle;
             ServerPortBoxBackground.Controls.Add(ServerPortBox);
             ServerPortBoxBackground.Dock = DockStyle.Fill;
+            ServerPortBoxBackground.ForeColor = Color.FromArgb(34, 34, 34);
             ServerPortBoxBackground.Location = new Point(4, 4);
             ServerPortBoxBackground.Margin = new Padding(4);
             ServerPortBoxBackground.Name = "ServerPortBoxBackground";
@@ -209,9 +224,10 @@
             // ServerPortBox
             // 
             ServerPortBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            ServerPortBox.BackColor = Color.White;
+            ServerPortBox.BackColor = Color.FromArgb(30, 30, 30);
             ServerPortBox.BorderStyle = BorderStyle.None;
             ServerPortBox.Font = new Font("Segoe UI", 23F);
+            ServerPortBox.ForeColor = Color.White;
             ServerPortBox.Location = new Point(0, 4);
             ServerPortBox.Margin = new Padding(0);
             ServerPortBox.MaxLength = 5;
@@ -228,20 +244,21 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            BackColor = SystemColors.Control;
             ClientSize = new Size(624, 321);
-            Controls.Add(tableLayoutPanel1);
+            Controls.Add(BackgroundPanel);
             Margin = new Padding(6, 4, 6, 4);
             MinimumSize = new Size(640, 360);
             Name = "Server";
             Text = "Blue Lagoon - Chaos Edition (SERVER)";
             Load += Server_Load;
             Resize += Form_Resize;
-            tableLayoutPanel1.ResumeLayout(false);
-            tableLayoutPanel4.ResumeLayout(false);
+            BackgroundPanel.ResumeLayout(false);
+            ConfigPanel.ResumeLayout(false);
             tableLayoutPanel5.ResumeLayout(false);
             MapSizeBoxBackground.ResumeLayout(false);
             MapSizeBoxBackground.PerformLayout();
-            tableLayoutPanel2.ResumeLayout(false);
+            ImportantPanel.ResumeLayout(false);
             ServerPortBoxBackground.ResumeLayout(false);
             ServerPortBoxBackground.PerformLayout();
             ResumeLayout(false);
@@ -249,13 +266,13 @@
 
         #endregion
 
-        internal TableLayoutPanel tableLayoutPanel1;
-        internal TableLayoutPanel tableLayoutPanel2;
+        internal TableLayoutPanel BackgroundPanel;
+        internal TableLayoutPanel ImportantPanel;
         internal Button ServerButton;
         internal TextBox ServerPortBox;
         internal Panel ServerPortBoxBackground;
-        internal TableLayoutPanel tableLayoutPanel3;
-        internal TableLayoutPanel tableLayoutPanel4;
+        internal TableLayoutPanel PlayerListPanel;
+        internal TableLayoutPanel ConfigPanel;
         private TableLayoutPanel tableLayoutPanel5;
         internal Panel MapSizeBoxBackground;
         internal TextBox MapSizeBox;
