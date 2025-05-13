@@ -144,6 +144,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
                             MapSizeBox.Enabled = false;
 
                             StartGame();
+                            SaveConfig();
                             Logging.Log($"Game started with map size {GameHandler.mapSize}");
                         }
 
@@ -210,7 +211,7 @@ namespace Blue_Lagoon___Chaos_Edition__SERVER_ {
         }
         private void PlayerText_MouseLeave(object? sender, EventArgs e) {
             if (sender is Label lbl) {
-                lbl.ForeColor = Color.Black;
+                lbl.ForeColor = Color.White;
                 lbl.Font = new Font(lbl.Font, FontStyle.Regular);
             }
         }
